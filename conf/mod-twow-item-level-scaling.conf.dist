@@ -1,0 +1,321 @@
+#
+# Turtle WoW Dynamic Item Level Scaling Configuration
+# Target Platform: Turtle WoW custom vMaNGOS (1.18.1 / 1.12.1) & TortoiseBots
+#
+
+[ModuleConf]
+
+###################################################################################################
+# GENERAL MODULE CONFIGURATION
+###################################################################################################
+#
+#    ItemScaling.Enable
+#        Description: Enable or disable the dynamic item level scaling module.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.Enable = 1
+
+#
+#    ItemScaling.ScaleDungeons
+#        Description: Enable item scaling for normal 5-player instanced dungeons.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.ScaleDungeons = 1
+
+#
+#    ItemScaling.ScaleRaids
+#        Description: Enable item scaling for instanced raids (10, 20, 40-player).
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.ScaleRaids = 1
+
+#
+#    ItemScaling.ScaleHeroics
+#        Description: Enable item scaling for heroic difficulty dungeons/raids.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.ScaleHeroics = 1
+
+#
+#    Granular Instance Category Toggles (1-to-1 Parity with AutoBalance)
+#        Description: Granular toggles to enable or disable item scaling per instance category:
+#                     Scale.HeroicDungeons (5-player heroic dungeons)
+#                     Scale.Raid10M        (10-player normal raids)
+#                     Scale.Raid10MHeroic  (10-player heroic raids)
+#                     Scale.Raid15M        (15-player raids, e.g. Upper Blackrock Spire)
+#                     Scale.Raid20M        (20-player raids, e.g. Zul'Gurub, Ruins of Ahn'Qiraj)
+#                     Scale.Raid25M        (25-player normal raids)
+#                     Scale.Raid25MHeroic  (25-player heroic raids)
+#                     Scale.Raid40M        (40-player raids, e.g. Molten Core, Blackwing Lair, AQ40, Naxxramas)
+#        Default:     1 - Enabled
+#
+
+ItemScaling.Scale.HeroicDungeons = 1
+ItemScaling.Scale.Raid10M = 1
+ItemScaling.Scale.Raid10MHeroic = 1
+ItemScaling.Scale.Raid15M = 1
+ItemScaling.Scale.Raid20M = 1
+ItemScaling.Scale.Raid25M = 1
+ItemScaling.Scale.Raid25MHeroic = 1
+ItemScaling.Scale.Raid40M = 1
+
+#
+#    ItemScaling.ScaleChests
+#        Description: Enable scaling for instanced chests and gameobject loot.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.ScaleChests = 1
+
+#
+#    ItemScaling.LevelScaling.Method
+#        Description: Method used to calculate the target effective scaling level.
+#                     "dynamic" - Scales relative to creature's live effective level in instance.
+#                     "fixed"   - Scales directly to the highest real player level (H).
+#        Default:     "dynamic"
+#
+
+ItemScaling.LevelScaling.Method = "dynamic"
+
+#
+#    ItemScaling.MinLevel
+#        Description: Minimum level for item scaling to activate.
+#        Default:     1
+#        Range:       1 - 80
+#
+
+ItemScaling.MinLevel = 1
+
+#
+#    ItemScaling.MaxLevel
+#        Description: Maximum level cap for item scaling.
+#        Default:     60 (Standard Turtle WoW Vanilla level cap; configure up to 80 for custom realms)
+#        Range:       1 - 80
+#
+
+ItemScaling.MaxLevel = 60
+
+#
+#    ItemScaling.RealPlayersOnly
+#        Description: If enabled, real human players are prioritized when determining
+#                     the highest player level (H) for scaling calculations. If no real players
+#                     are in the dungeon (all-bot party or bot testing), the highest bot level
+#                     is automatically used as fallback so bot dungeons scale properly.
+#        Default:     1 - Prioritize real players; fallback to bots if no real players in map
+#                     0 - Treat bots and real players equally
+#
+
+ItemScaling.RealPlayersOnly = 1
+
+#
+#    ItemScaling.IncludeGameMasters
+#        Description: If enabled, GameMasters with GM mode active will count towards H.
+#        Default:     1 - GMs included (recommended for testing & GM play)
+#                     0 - GMs excluded
+#
+
+ItemScaling.IncludeGameMasters = 1
+
+#
+#    ItemScaling.ScaleUp / ScaleDown
+#        Description: Control directional scaling behavior.
+#                     ScaleUp:   Scale lower-level items up to match higher-level party.
+#                     ScaleDown: Scale higher-level items down to match lower-level party.
+#        Default:     1 - Enabled
+#
+
+ItemScaling.ScaleUp = 1
+ItemScaling.ScaleDown = 1
+
+#
+#    ItemScaling.ScaleUniqueItems
+#        Description: Allow scaling of Unique and Unique-Equipped items.
+#        Default:     1 - Enabled
+#
+
+ItemScaling.ScaleUniqueItems = 1
+
+#
+#    ItemScaling.ScaleExistingScalingItems
+#        Description: If enabled, items that already possess native scaling properties
+#                     (such as heirlooms) will be scaled by this module.
+#        Default:     0 - Disabled (Native scaling items untouched)
+#                     1 - Enabled
+#
+
+ItemScaling.ScaleExistingScalingItems = 0
+
+#
+#    ItemScaling.PreserveNonZeroStats
+#        Description: Ensures non-zero item statistics never round down to 0 during scaling.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.PreserveNonZeroStats = 1
+
+#
+#    ItemScaling.ScaleEquipSpells
+#        Description: Enable scaling of passive on-equip special effects (e.g. Armor Penetration,
+#                     Mana Regen / MP5, Spell Damage / Spell Power, Healing Done, Attack Power,
+#                     Ranged Attack Power, Defense, Shield Block Value, Health Regen / HP5, School Damage).
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ItemScaling.ScaleEquipSpells = 1
+
+###################################################################################################
+# QUALITY AND SLOT FILTERS
+###################################################################################################
+#
+#    Quality Scaling Toggles
+#        Description: Enable or disable scaling per item quality tier.
+#                     Both 'ItemScaling.Scale*' (upstream WotLK) and 'ItemScaling.Quality.*' are supported.
+#        Default:     1 - Enabled
+#
+
+ItemScaling.ScalePoor = 1
+ItemScaling.ScaleCommon = 1
+ItemScaling.ScaleUncommon = 1
+ItemScaling.ScaleRare = 1
+ItemScaling.ScaleEpic = 1
+ItemScaling.ScaleLegendary = 1
+ItemScaling.ScaleArtifact = 1
+
+# Backward-compatible quality aliases:
+ItemScaling.Quality.Poor = 1
+ItemScaling.Quality.Normal = 1
+ItemScaling.Quality.Uncommon = 1
+ItemScaling.Quality.Rare = 1
+ItemScaling.Quality.Epic = 1
+ItemScaling.Quality.Legendary = 1
+ItemScaling.Quality.Artifact = 1
+
+#
+#    ItemScaling.RandomSuffix.Mode
+#        Description: Handling of items with random property enchantments.
+#                     0 - Skip: Preserve original Blizzard item without scaling.
+#                     1 - Bake: Permanently bake rolled enchantment stats into template.
+#        Default:     1 - Bake
+#
+
+ItemScaling.RandomSuffix.Mode = 1
+
+#
+#    ItemScaling.RequiredLevel.Policy
+#        Description: Policy for setting the RequiredLevel of generated variants:
+#                     "target"               - Equals target effective level.
+#                     "player"               - Equals highest real player level (H).
+#                     "target-capped-player" - min(target, H).
+#        Default:     "target"
+#
+
+ItemScaling.RequiredLevel.Policy = "target"
+
+#
+#    ItemScaling.PreserveNativeLoot
+#        Description: When enabled, drops whose native level matches the target or player level
+#                     are awarded as standard Blizzard items without generating synthetic variants.
+#        Default:     1 - Enabled
+#
+
+ItemScaling.PreserveNativeLoot = 1
+
+###################################################################################################
+# DYNAMIC LEVEL OFFSETS (FLOORS & CEILINGS)
+###################################################################################################
+
+ItemScaling.Dynamic.Floor.Dungeons = 3
+ItemScaling.Dynamic.Ceiling.Dungeons = 0
+
+ItemScaling.Dynamic.Floor.HeroicDungeons = 3
+ItemScaling.Dynamic.Ceiling.HeroicDungeons = 0
+
+ItemScaling.Dynamic.Floor.Raids = 3
+ItemScaling.Dynamic.Ceiling.Raids = 0
+
+ItemScaling.Dynamic.Floor.Raid10M = 3
+ItemScaling.Dynamic.Ceiling.Raid10M = 0
+
+ItemScaling.Dynamic.Floor.Raid15M = 3
+ItemScaling.Dynamic.Ceiling.Raid15M = 0
+
+ItemScaling.Dynamic.Floor.Raid20M = 3
+ItemScaling.Dynamic.Ceiling.Raid20M = 0
+
+ItemScaling.Dynamic.Floor.Raid25M = 3
+ItemScaling.Dynamic.Ceiling.Raid25M = 0
+
+ItemScaling.Dynamic.Floor.Raid40M = 3
+ItemScaling.Dynamic.Ceiling.Raid40M = 0
+
+###################################################################################################
+# DYNAMIC FLOOR AND CEILING VARIANCE
+###################################################################################################
+
+ItemScaling.Dynamic.Floor.Variance.Enable = 1
+ItemScaling.Dynamic.Ceiling.Variance.Enable = 0
+ItemScaling.Dynamic.Variance.Scope = 0
+
+# Positional format: "-3:5.0, -2:10.0, -1:20.0"
+ItemScaling.Dynamic.Floor.Variance.Dungeons = "-1:20.0, -2:10.0, -3:5.0"
+ItemScaling.Dynamic.Ceiling.Variance.Dungeons = ""
+ItemScaling.Dynamic.Floor.Variance.HeroicDungeons = "-1:20.0, -2:10.0, -3:5.0"
+ItemScaling.Dynamic.Ceiling.Variance.HeroicDungeons = ""
+ItemScaling.Dynamic.Floor.Variance.Raids = ""
+ItemScaling.Dynamic.Ceiling.Variance.Raids = ""
+
+ItemScaling.Dynamic.Floor.Variance.Raid10M = ""
+ItemScaling.Dynamic.Ceiling.Variance.Raid10M = ""
+ItemScaling.Dynamic.Floor.Variance.Raid15M = ""
+ItemScaling.Dynamic.Ceiling.Variance.Raid15M = ""
+ItemScaling.Dynamic.Floor.Variance.Raid20M = ""
+ItemScaling.Dynamic.Ceiling.Variance.Raid20M = ""
+ItemScaling.Dynamic.Floor.Variance.Raid25M = ""
+ItemScaling.Dynamic.Ceiling.Variance.Raid25M = ""
+ItemScaling.Dynamic.Floor.Variance.Raid40M = ""
+ItemScaling.Dynamic.Ceiling.Variance.Raid40M = ""
+
+###################################################################################################
+# PER-INSTANCE OVERRIDES & AUTOBALANCE INTEROP
+###################################################################################################
+
+# Format: "MapID SkipHigher SkipLower Ceiling Floor" or "MapID Ceiling Floor"
+ItemScaling.Dynamic.PerInstance = ""
+
+# Adopt AutoBalance configuration if present
+ItemScaling.UseAutoBalanceSettings = 0
+
+###################################################################################################
+# LIVE GENERATION, PERSISTENCE & RESERVED SLOTS
+###################################################################################################
+
+ItemScaling.Live.Enable = 1
+ItemScaling.Live.GenerationMode = 2
+ItemScaling.Live.ReservedSlots = 4096
+ItemScaling.Live.MaxPendingVariants = 4096
+ItemScaling.Live.MaxPublishPerTick = 64
+ItemScaling.Live.LootWaitTimeoutMs = 10000
+
+# Synthetic Entry ID Allocation Range ("auto" dynamically queries max item_template ID)
+ItemScaling.SyntheticEntry.Start = "auto"
+ItemScaling.SyntheticEntry.AutoOffset = 1000
+ItemScaling.SyntheticEntry.Maximum = 2000000
+
+# Exclusions
+ItemScaling.ExcludedMapIds = ""
+ItemScaling.ExcludedItemIds = ""
+
+# Diagnostics and Announcements
+ItemScaling.Debug = 1
+ItemScaling.Announce = 1
