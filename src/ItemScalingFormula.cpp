@@ -10,6 +10,8 @@
 #include "ItemScalingTarget.h"
 #include "Database/DBCStores.h"
 #include "Database/DBCStructure.h"
+#include "Spells/SpellMgr.h"
+#include "Spells/SpellAuraDefines.h"
 #include "Log.h"
 #include <algorithm>
 #include <cmath>
@@ -326,16 +328,95 @@ namespace ItemScalingFormula
                     continue;
                 }
 
-                hasBonus = true;
-                if (type == 5) // ITEM_ENCHANTMENT_TYPE_STAT
+                if (type == 3) // ITEM_ENCHANTMENT_TYPE_EQUIP_SPELL (Vanilla 1.12.1)
+                {
+                    uint32 spellId = ench->spellid[i];
+                    if (!spellId)
+                    {
+                        continue;
+                    }
+
+                    SpellEntry const* spell = sSpellMgr.GetSpellEntry(spellId);
+                    if (!spell)
+                    {
+                        return false;
+                    }
+
+                    bool supportedAuraFound = false;
+                    for (uint32 eff = 0; eff < 3; ++eff)
+                    {
+                        if (!spell->Effect[eff])
+                        {
+                            continue;
+                        }
+
+                        uint32 aura = spell->EffectApplyAuraName[eff];
+                        int32 misc = spell->EffectMiscValue[eff];
+
+                        if (aura == SPELL_AURA_MOD_STAT)
+                        {
+                            uint32 itemMod = 0;
+                            switch (misc)
+                            {
+                                case STAT_STRENGTH:  itemMod = ITEM_MOD_STRENGTH; break;  // 0 -> 4
+                                case STAT_AGILITY:   itemMod = ITEM_MOD_AGILITY; break;   // 1 -> 3
+                                case STAT_STAMINA:   itemMod = ITEM_MOD_STAMINA; break;   // 2 -> 7
+                                case STAT_INTELLECT: itemMod = ITEM_MOD_INTELLECT; break; // 3 -> 5
+                                case STAT_SPIRIT:    itemMod = ITEM_MOD_SPIRIT; break;    // 4 -> 6
+                                default:
+                                    return false; // Unsupported stat type
+                            }
+                            types.insert(itemMod);
+                            supportedAuraFound = true;
+                            hasBonus = true;
+                        }
+                        else if (aura == SPELL_AURA_MOD_RESISTANCE)
+                        {
+                            if (misc == 1 || (misc & 126) != 0 ||
+                                (misc >= SPELL_SCHOOL_NORMAL && misc <= SPELL_SCHOOL_ARCANE))
+                            {
+                                supportedAuraFound = true;
+                                hasBonus = true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            // Procs, spells, combat effects cannot be baked cleanly into raw stats
+                            return false;
+                        }
+                    }
+
+                    if (!supportedAuraFound)
+                    {
+                        return false;
+                    }
+                }
+                else if (type == 5) // ITEM_ENCHANTMENT_TYPE_STAT (WotLK flat stat)
                 {
                     if (ench->spellid[i] >= MAX_ITEM_MOD)
                     {
                         return false;
                     }
                     types.insert(ench->spellid[i]);
+                    hasBonus = true;
                 }
-                else if (type != 4 || ench->spellid[i] < SPELL_SCHOOL_HOLY || ench->spellid[i] > SPELL_SCHOOL_ARCANE)
+                else if (type == 4) // ITEM_ENCHANTMENT_TYPE_RESISTANCE
+                {
+                    if (ench->spellid[i] == 0 ||
+                        (ench->spellid[i] >= SPELL_SCHOOL_HOLY && ench->spellid[i] <= SPELL_SCHOOL_ARCANE))
+                    {
+                        hasBonus = true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
                 {
                     return false; // Procs/spells/on-hit cannot be baked cleanly into raw stats
                 }
@@ -403,6 +484,77 @@ namespace ItemScalingFormula
             return true;
         };
 
+        auto applyStat = [&](uint32 stat, int64 value) -> bool
+        {
+            if (!value)
+            {
+                return true;
+            }
+
+            int32 slot = -1;
+            int32 firstEmpty = -1;
+            for (int32 s = 0; s < MAX_ITEM_PROTO_STATS; ++s)
+            {
+                if (baked.ItemStat[s].ItemStatValue != 0 && baked.ItemStat[s].ItemStatType == stat)
+                {
+                    slot = s;
+                    break;
+                }
+                if (baked.ItemStat[s].ItemStatValue == 0 && firstEmpty == -1)
+                {
+                    firstEmpty = s;
+                }
+            }
+
+            if (slot == -1)
+            {
+                if (firstEmpty == -1)
+                {
+                    return false;
+                }
+                slot = firstEmpty;
+                baked.ItemStat[slot].ItemStatType = stat;
+                baked.ItemStat[slot].ItemStatValue = 0;
+            }
+
+            return accumulate(baked.ItemStat[slot].ItemStatValue, value, false);
+        };
+
+        auto applyResistance = [&](int32 schoolOrMisc, int64 value) -> bool
+        {
+            if (!value)
+            {
+                return true;
+            }
+
+            if (schoolOrMisc == (1 << SPELL_SCHOOL_HOLY) || schoolOrMisc == SPELL_SCHOOL_HOLY)
+                return accumulate(baked.HolyRes, value, true);
+            if (schoolOrMisc == (1 << SPELL_SCHOOL_FIRE) || schoolOrMisc == SPELL_SCHOOL_FIRE)
+                return accumulate(baked.FireRes, value, true);
+            if (schoolOrMisc == (1 << SPELL_SCHOOL_NATURE) || schoolOrMisc == SPELL_SCHOOL_NATURE)
+                return accumulate(baked.NatureRes, value, true);
+            if (schoolOrMisc == (1 << SPELL_SCHOOL_FROST) || schoolOrMisc == SPELL_SCHOOL_FROST)
+                return accumulate(baked.FrostRes, value, true);
+            if (schoolOrMisc == (1 << SPELL_SCHOOL_SHADOW) || schoolOrMisc == SPELL_SCHOOL_SHADOW)
+                return accumulate(baked.ShadowRes, value, true);
+            if (schoolOrMisc == (1 << SPELL_SCHOOL_ARCANE) || schoolOrMisc == SPELL_SCHOOL_ARCANE)
+                return accumulate(baked.ArcaneRes, value, true);
+            if (schoolOrMisc == 126) // All magic schools
+            {
+                return accumulate(baked.HolyRes, value, true) &&
+                       accumulate(baked.FireRes, value, true) &&
+                       accumulate(baked.NatureRes, value, true) &&
+                       accumulate(baked.FrostRes, value, true) &&
+                       accumulate(baked.ShadowRes, value, true) &&
+                       accumulate(baked.ArcaneRes, value, true);
+            }
+            if (schoolOrMisc == 1 || schoolOrMisc == SPELL_SCHOOL_NORMAL || schoolOrMisc == 0)
+            {
+                return accumulate(baked.Armor, value, false);
+            }
+            return false;
+        };
+
         for (uint32 k = 0; k < 3; ++k)
         {
             uint32 id = propEntry->enchant_id[k];
@@ -425,73 +577,111 @@ namespace ItemScalingFormula
                     continue;
                 }
 
-                double amount = std::round(double(ench->amount[i]) * rBudget);
-                if (ench->amount[i] != 0 && amount == 0.0 && sItemScalingConfig->PreserveNonZeroStats)
+                if (type == 3) // ITEM_ENCHANTMENT_TYPE_EQUIP_SPELL (Vanilla 1.12.1)
                 {
-                    amount = ench->amount[i] > 0 ? 1.0 : -1.0;
-                }
-
-                if (!std::isfinite(amount) || amount < std::numeric_limits<int32>::min() ||
-                    amount > std::numeric_limits<int32>::max())
-                {
-                    return false;
-                }
-
-                int64 value = static_cast<int64>(amount);
-                if (!value)
-                {
-                    continue;
-                }
-
-                uint32 stat = ench->spellid[i];
-                if (type == 5) // Stat
-                {
-                    int32 slot = -1;
-                    int32 firstEmpty = -1;
-                    for (int32 s = 0; s < MAX_ITEM_PROTO_STATS; ++s)
+                    uint32 spellId = ench->spellid[i];
+                    if (!spellId)
                     {
-                        if (baked.ItemStat[s].ItemStatValue != 0 && baked.ItemStat[s].ItemStatType == stat)
-                        {
-                            slot = s;
-                            break;
-                        }
-                        if (baked.ItemStat[s].ItemStatValue == 0 && firstEmpty == -1)
-                        {
-                            firstEmpty = s;
-                        }
+                        continue;
                     }
 
-                    if (slot == -1)
+                    SpellEntry const* spell = sSpellMgr.GetSpellEntry(spellId);
+                    if (!spell)
                     {
-                        if (firstEmpty == -1)
+                        return false;
+                    }
+
+                    for (uint32 eff = 0; eff < 3; ++eff)
+                    {
+                        if (!spell->Effect[eff])
+                        {
+                            continue;
+                        }
+
+                        int32 basePoints = spell->EffectBasePoints[eff] + 1;
+                        double amount = std::round(double(basePoints) * rBudget);
+                        if (basePoints != 0 && amount == 0.0 && sItemScalingConfig->PreserveNonZeroStats)
+                        {
+                            amount = basePoints > 0 ? 1.0 : -1.0;
+                        }
+
+                        if (!std::isfinite(amount) || amount < std::numeric_limits<int32>::min() ||
+                            amount > std::numeric_limits<int32>::max())
                         {
                             return false;
                         }
-                        slot = firstEmpty;
-                        baked.ItemStat[slot].ItemStatType = stat;
-                        baked.ItemStat[slot].ItemStatValue = 0;
+
+                        int64 value = static_cast<int64>(amount);
+                        uint32 aura = spell->EffectApplyAuraName[eff];
+                        int32 misc = spell->EffectMiscValue[eff];
+
+                        if (aura == SPELL_AURA_MOD_STAT)
+                        {
+                            uint32 stat = 0;
+                            switch (misc)
+                            {
+                                case STAT_STRENGTH:  stat = ITEM_MOD_STRENGTH; break;
+                                case STAT_AGILITY:   stat = ITEM_MOD_AGILITY; break;
+                                case STAT_STAMINA:   stat = ITEM_MOD_STAMINA; break;
+                                case STAT_INTELLECT: stat = ITEM_MOD_INTELLECT; break;
+                                case STAT_SPIRIT:    stat = ITEM_MOD_SPIRIT; break;
+                                default: return false;
+                            }
+
+                            if (!applyStat(stat, value))
+                            {
+                                return false;
+                            }
+                        }
+                        else if (aura == SPELL_AURA_MOD_RESISTANCE)
+                        {
+                            if (!applyResistance(misc, value))
+                            {
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (type == 5) // ITEM_ENCHANTMENT_TYPE_STAT (WotLK flat stat)
+                {
+                    double amount = std::round(double(ench->amount[i]) * rBudget);
+                    if (ench->amount[i] != 0 && amount == 0.0 && sItemScalingConfig->PreserveNonZeroStats)
+                    {
+                        amount = ench->amount[i] > 0 ? 1.0 : -1.0;
                     }
 
-                    if (!accumulate(baked.ItemStat[slot].ItemStatValue, value, false))
+                    if (!std::isfinite(amount) || amount < std::numeric_limits<int32>::min() ||
+                        amount > std::numeric_limits<int32>::max())
+                    {
+                        return false;
+                    }
+
+                    int64 value = static_cast<int64>(amount);
+                    if (!applyStat(ench->spellid[i], value))
                     {
                         return false;
                     }
                 }
-                else if (type == 4) // Resistance
+                else if (type == 4) // ITEM_ENCHANTMENT_TYPE_RESISTANCE
                 {
-                    int32* resistance = nullptr;
-                    switch (stat)
+                    double amount = std::round(double(ench->amount[i]) * rBudget);
+                    if (ench->amount[i] != 0 && amount == 0.0 && sItemScalingConfig->PreserveNonZeroStats)
                     {
-                        case SPELL_SCHOOL_HOLY: resistance = &baked.HolyRes; break;
-                        case SPELL_SCHOOL_FIRE: resistance = &baked.FireRes; break;
-                        case SPELL_SCHOOL_NATURE: resistance = &baked.NatureRes; break;
-                        case SPELL_SCHOOL_FROST: resistance = &baked.FrostRes; break;
-                        case SPELL_SCHOOL_SHADOW: resistance = &baked.ShadowRes; break;
-                        case SPELL_SCHOOL_ARCANE: resistance = &baked.ArcaneRes; break;
-                        default: return false;
+                        amount = ench->amount[i] > 0 ? 1.0 : -1.0;
                     }
 
-                    if (!accumulate(*resistance, value, true))
+                    if (!std::isfinite(amount) || amount < std::numeric_limits<int32>::min() ||
+                        amount > std::numeric_limits<int32>::max())
+                    {
+                        return false;
+                    }
+
+                    int64 value = static_cast<int64>(amount);
+                    if (!applyResistance(ench->spellid[i], value))
                     {
                         return false;
                     }
