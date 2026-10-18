@@ -12,11 +12,15 @@
 #include "ItemScalingRegistry.h"
 #include "ItemScalingLive.h"
 #include "Chat/Chat.h"
+#include "Database/DBCStores.h"
+#include "Database/DBCStructure.h"
+#include "Item.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptObjects.h"
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 #include <string>
 
 static char const* GetPolicyName(RequiredLevelPolicy policy)
@@ -28,6 +32,54 @@ static char const* GetPolicyName(RequiredLevelPolicy policy)
         case REQ_POLICY_TARGET_CAPPED_PLAYER: return "target-capped-player";
         default: return "unknown";
     }
+}
+
+static int32 ResolveRandomProperty(ItemPrototype const* proto, std::string const& suffixArg)
+{
+    if (!proto || proto->RandomProperty == 0)
+    {
+        return 0;
+    }
+
+    if (!suffixArg.empty())
+    {
+        char* end = nullptr;
+        uint32 propId = strtoul(suffixArg.c_str(), &end, 10);
+        if (propId != 0 && (!end || !*end))
+        {
+            if (sItemRandomPropertiesStore.LookupEntry(propId) &&
+                ItemScalingFormula::CanBakeRandomProperty(*proto, static_cast<int32>(propId)))
+            {
+                return static_cast<int32>(propId);
+            }
+        }
+
+        // Case-insensitive name search (e.g. "bear", "boar", "eagle", "monkey", "whale", "wolf")
+        std::string lowerArg = suffixArg;
+        std::transform(lowerArg.begin(), lowerArg.end(), lowerArg.begin(), ::tolower);
+        for (uint32 id = 1; id < sItemRandomPropertiesStore.GetNumRows(); ++id)
+        {
+            if (ItemRandomPropertiesEntry const* entry = sItemRandomPropertiesStore.LookupEntry(id))
+            {
+                char const* sName = entry->nameSuffix[0];
+                if (sName && sName[0])
+                {
+                    std::string lowerName = sName;
+                    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+                    if (lowerName.find(lowerArg) != std::string::npos)
+                    {
+                        if (ItemScalingFormula::CanBakeRandomProperty(*proto, static_cast<int32>(id)))
+                        {
+                            return static_cast<int32>(id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Default: auto-roll from core item template
+    return Item::GenerateItemRandomPropertyId(proto->ItemId);
 }
 
 namespace
@@ -104,8 +156,8 @@ namespace
             {
                 handler->SendSysMessage("|cff3399ff[ItemScaling] Commands:|r");
                 handler->SendSysMessage("  .itemscaling status");
-                handler->SendSysMessage("  .itemscaling preview <itemId> [targetLevel]");
-                handler->SendSysMessage("  .itemscaling generate <itemId> [targetLevel]");
+                handler->SendSysMessage("  .itemscaling preview <itemId> [targetLevel] [suffix]");
+                handler->SendSysMessage("  .itemscaling generate <itemId> [targetLevel] [suffix]");
                 handler->SendSysMessage("  .itemscaling reload");
             }
             return false;
@@ -151,7 +203,76 @@ namespace
             handler->PSendSysMessage("Live Scaling: %s | Available slots: %u", live.enabled ? "|cff00ff00Active|r" : "|cffff0000Inactive|r", static_cast<uint32>(live.available));
             handler->PSendSysMessage("Live Variants: Pending=%u Durable=%u Ready=%u | Failures=%u",
                 static_cast<uint32>(live.pending), static_cast<uint32>(live.durable), static_cast<uint32>(live.ready), static_cast<uint32>(live.failures));
-            handler->SendSysMessage("|cffaaaaaaUsage: .itemscaling preview <itemId> [targetLevel]|r");
+            handler->SendSysMessage("|cffaaaaaaUsage: .itemscaling preview <itemId> [targetLevel] [suffix]|r");
+        }
+
+        static void ParseArgs(std::string const& rest, uint32& outItemId, uint32& outTargetLvl, std::string& outSuffix)
+        {
+            outItemId = 0;
+            outTargetLvl = 60;
+            outSuffix.clear();
+
+            auto linkPos = rest.find("|Hitem:");
+            if (linkPos != std::string::npos)
+            {
+                size_t idStart = linkPos + 7;
+                size_t idEnd = rest.find(':', idStart);
+                if (idEnd != std::string::npos)
+                {
+                    outItemId = static_cast<uint32>(strtoul(rest.substr(idStart, idEnd - idStart).c_str(), nullptr, 10));
+                }
+                auto linkClose = rest.find("|h|r", linkPos);
+                if (linkClose != std::string::npos)
+                {
+                    std::string rem = rest.substr(linkClose + 4);
+                    std::istringstream iss(rem);
+                    std::string t1, t2;
+                    if (iss >> t1)
+                    {
+                        char* end = nullptr;
+                        uint32 lvl = strtoul(t1.c_str(), &end, 10);
+                        if (lvl > 0 && (!end || !*end))
+                        {
+                            outTargetLvl = lvl;
+                            if (iss >> t2)
+                            {
+                                outSuffix = t2;
+                            }
+                        }
+                        else
+                        {
+                            outSuffix = t1;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                std::istringstream iss(rest);
+                std::string t1, t2, t3;
+                if (iss >> t1)
+                {
+                    outItemId = static_cast<uint32>(strtoul(t1.c_str(), nullptr, 10));
+                    if (iss >> t2)
+                    {
+                        char* end = nullptr;
+                        uint32 lvl = strtoul(t2.c_str(), &end, 10);
+                        if (lvl > 0 && (!end || !*end))
+                        {
+                            outTargetLvl = lvl;
+                            if (iss >> t3)
+                            {
+                                outSuffix = t3;
+                            }
+                        }
+                        else
+                        {
+                            outSuffix = t2;
+                        }
+                    }
+                }
+            }
+            outTargetLvl = std::clamp<uint32>(outTargetLvl, 1, 80);
         }
 
         void HandlePreview(ChatHandler* handler, std::string const& rest)
@@ -163,48 +284,14 @@ namespace
 
             if (rest.empty())
             {
-                handler->SendSysMessage("Usage: .itemscaling preview <itemId> [targetLevel]");
+                handler->SendSysMessage("Usage: .itemscaling preview <itemId> [targetLevel] [suffix]");
                 return;
             }
 
             uint32 itemId = 0;
             uint32 targetLvl = 60;
-            auto linkPos = rest.find("|Hitem:");
-            if (linkPos != std::string::npos)
-            {
-                size_t idStart = linkPos + 7;
-                size_t idEnd = rest.find(':', idStart);
-                if (idEnd != std::string::npos)
-                {
-                    itemId = static_cast<uint32>(strtoul(rest.substr(idStart, idEnd - idStart).c_str(), nullptr, 10));
-                }
-                auto linkClose = rest.find("|h|r", linkPos);
-                if (linkClose != std::string::npos)
-                {
-                    std::string rem = rest.substr(linkClose + 4);
-                    char* end = nullptr;
-                    uint32 lvl = strtoul(rem.c_str(), &end, 10);
-                    if (lvl > 0)
-                    {
-                        targetLvl = lvl;
-                    }
-                }
-            }
-            else
-            {
-                char const* start = rest.c_str();
-                char* end = nullptr;
-                itemId = strtoul(start, &end, 10);
-                if (end && *end)
-                {
-                    targetLvl = strtoul(end, nullptr, 10);
-                    if (targetLvl == 0)
-                    {
-                        targetLvl = 60;
-                    }
-                }
-            }
-            targetLvl = std::clamp<uint32>(targetLvl, 1, 80);
+            std::string suffixArg;
+            ParseArgs(rest, itemId, targetLvl, suffixArg);
 
             ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
             if (!proto)
@@ -224,9 +311,19 @@ namespace
             int8 family = ItemScalingFormula::GetSlotFamily(proto->InventoryType);
             double rBudget = ItemScalingFormula::GetBudgetRatio(proto->ItemLevel, targetIlvl, proto->Quality, family < 0 ? 2 : static_cast<uint8>(family));
 
-            handler->PSendSysMessage("|cff3399ff[ItemScaling Preview]|r Item %u '%s'", itemId, proto->Name1.c_str());
+            int32 randomPropId = ResolveRandomProperty(proto, suffixArg);
+            ItemPrototype bakedProto = *proto;
+            if (randomPropId != 0)
+            {
+                ItemScalingFormula::BakeRandomSuffixStats(bakedProto, proto, randomPropId, targetIlvl, rBudget);
+                proto = &bakedProto;
+            }
+
+            handler->PSendSysMessage("|cff3399ff[ItemScaling Preview]|r Item %u '%s'%s",
+                itemId, proto->Name1.c_str(),
+                randomPropId != 0 ? " |cff00ff00[Baked Affix]|r" : "");
             handler->PSendSysMessage("  Native: ReqLevel %u, ItemLevel %u -> Target: Level %u, ItemLevel %u (Ratio: %.3f)",
-                proto->RequiredLevel, proto->ItemLevel, targetLvl, targetIlvl, rBudget);
+                bakedProto.RequiredLevel, bakedProto.ItemLevel, targetLvl, targetIlvl, rBudget);
 
             if (proto->Armor > 0)
             {
@@ -247,10 +344,12 @@ namespace
             {
                 if (proto->ItemStat[i].ItemStatValue != 0)
                 {
-                    int32 scaledStat = ItemScalingFormula::ScaleAdditiveStat(
-                        proto->ItemStat[i].ItemStatValue, rBudget, sItemScalingConfig->PreserveNonZeroStats);
-                    handler->PSendSysMessage("  Stat %u: %d -> %d",
-                        proto->ItemStat[i].ItemStatType, proto->ItemStat[i].ItemStatValue, scaledStat);
+                    int32 scaledStat = (randomPropId != 0)
+                        ? proto->ItemStat[i].ItemStatValue
+                        : ItemScalingFormula::ScaleAdditiveStat(proto->ItemStat[i].ItemStatValue, rBudget, sItemScalingConfig->PreserveNonZeroStats);
+                    handler->PSendSysMessage("  Stat %u: %d%s",
+                        proto->ItemStat[i].ItemStatType, scaledStat,
+                        randomPropId != 0 ? " (Baked from Affix)" : "");
                 }
             }
 
@@ -261,8 +360,8 @@ namespace
                     uint32 scaledSpell = ItemScalingEquipSpell::FindScaledEquipSpell(proto->Spells[i].SpellId, rBudget);
                     int32 baseVal = ItemScalingEquipSpell::GetEquipSpellBaseValue(proto->Spells[i].SpellId);
                     int32 scaledVal = ItemScalingEquipSpell::GetEquipSpellBaseValue(scaledSpell);
-                    EquipSpellFamily family = ItemScalingEquipSpell::GetSpellFamily(proto->Spells[i].SpellId);
-                    char const* famName = ItemScalingEquipSpell::GetFamilyName(family);
+                    EquipSpellFamily fam = ItemScalingEquipSpell::GetSpellFamily(proto->Spells[i].SpellId);
+                    char const* famName = ItemScalingEquipSpell::GetFamilyName(fam);
 
                     if (scaledSpell != 0 && scaledSpell != proto->Spells[i].SpellId)
                     {
@@ -287,24 +386,14 @@ namespace
 
             if (rest.empty())
             {
-                handler->SendSysMessage("Usage: .itemscaling generate <itemId> [targetLevel]");
+                handler->SendSysMessage("Usage: .itemscaling generate <itemId> [targetLevel] [suffix]");
                 return;
             }
 
             uint32 itemId = 0;
             uint32 targetLvl = 60;
-            char const* start = rest.c_str();
-            char* end = nullptr;
-            itemId = strtoul(start, &end, 10);
-            if (end && *end)
-            {
-                targetLvl = strtoul(end, nullptr, 10);
-                if (targetLvl == 0)
-                {
-                    targetLvl = 60;
-                }
-            }
-            targetLvl = std::clamp<uint32>(targetLvl, 1, 80);
+            std::string suffixArg;
+            ParseArgs(rest, itemId, targetLvl, suffixArg);
 
             ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
             if (!proto)
@@ -321,6 +410,7 @@ namespace
 
             uint8 origRef = ItemScalingFormula::GetNativeReferenceLevel(proto);
             uint16 targetIlvl = sItemScalingBaseline->CalculateTargetItemLevel(proto, static_cast<uint8>(targetLvl), origRef);
+            int32 randomPropId = ResolveRandomProperty(proto, suffixArg);
 
             uint32 variantEntry = sItemScalingRegistry->FindOrRequestVariant(
                 proto,
@@ -328,13 +418,15 @@ namespace
                 targetIlvl,
                 sItemScalingConfig->FormulaVersion,
                 static_cast<uint8>(targetLvl),
-                0
+                randomPropId
             );
 
             if (variantEntry != 0)
             {
+                ItemPrototype const* varProto = sObjectMgr.GetItemPrototype(variantEntry);
+                char const* varName = varProto ? varProto->Name1.c_str() : proto->Name1.c_str();
                 handler->PSendSysMessage("|cff00ff00[ItemScaling] Successfully generated variant %u for '%s' (Base %u) -> Target Lv %u (Ilvl %u)|r",
-                    variantEntry, proto->Name1.c_str(), proto->ItemId, targetLvl, targetIlvl);
+                    variantEntry, varName, proto->ItemId, targetLvl, targetIlvl);
                 if (handler->GetSession() && handler->GetSession()->GetPlayer())
                 {
                     handler->GetSession()->GetPlayer()->AddItem(variantEntry, 1);
