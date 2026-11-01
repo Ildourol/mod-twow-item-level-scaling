@@ -70,7 +70,7 @@ static uint8 GetHighestEligibleRealPlayerLevel(Map const* map)
 
     for (auto const& ref : map->GetPlayers())
     {
-        Player* player = ref.GetSource();
+        Player* player = ref.getSource();
         if (!player || !player->IsInWorld())
         {
             continue;
@@ -178,7 +178,7 @@ Player* ItemScalingLootScript::GetEligibleOwner(Map const* map)
 
     for (auto const& ref : map->GetPlayers())
     {
-        Player* player = ref.GetSource();
+        Player* player = ref.getSource();
         if (!player || !player->IsInWorld())
         {
             continue;

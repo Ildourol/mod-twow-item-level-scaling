@@ -202,7 +202,7 @@ void ItemScalingLive::EnterMap(Map const& map, Player* player)
 
             for (auto const& ref : map.GetPlayers())
             {
-                if (Player* p = ref.GetSource())
+                if (Player* p = ref.getSource())
                 {
                     if (p->IsInWorld() && p->GetSession() && !p->GetSession()->IsHeadless())
                     {
