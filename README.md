@@ -23,100 +23,29 @@ The module dynamically adapts instanced equipment drops to the current party and
 
 ## 2. Installation
 
-These steps assume you have a working [TortoiseWoW](https://github.com/Penqle/tortoise-wow) source checkout, initialized core databases, and the server data files for your realm. Use a core revision compatible with this module. Run all build and SQL commands from the core source root, the directory containing the core's `CMakeLists.txt`.
-
-
-### 1. Add the module and build on Linux
-
-Use Git, CMake, a C++17 compiler, and the core's build dependencies. On Debian or Ubuntu, a typical starting point is:
+From the TortoiseWoW source root, clone or copy the module directly into `modules/mod-twow-item-level-scaling/`.
 
 ```bash
-sudo apt update
-sudo apt install git cmake build-essential libace-dev default-libmysqlclient-dev libssl-dev zlib1g-dev
-```
-
-Use your distribution's `mysql` or `mariadb` command-line client if importing SQL manually. Keep any additional dependency and CMake settings required by your core and other enabled modules.
-
-```bash
-cd /path/to/tortoise-wow
 git clone https://github.com/Ildourol/mod-twow-item-level-scaling.git modules/mod-twow-item-level-scaling
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/server-stage" -DMODULE_MOD_TWOW_ITEM_LEVEL_SCALING=static
-cmake --build build --parallel
-cmake --install build
 ```
-
-### 2. Add the module and build on Windows
-
-Install Git for Windows, CMake 3.21 or later, and Visual Studio 2022 or its Build Tools with **Desktop development with C++** and a Windows SDK. Open PowerShell with Git and CMake on `PATH`. Use an x64 build and the dependency setup of your working core.
-
-```powershell
-Set-Location 'C:\src\tortoise-wow'
-git clone https://github.com/Ildourol/mod-twow-item-level-scaling.git modules/mod-twow-item-level-scaling
-cmake -S . -B build-vs -G "Visual Studio 17 2022" -A x64 "-DCMAKE_INSTALL_PREFIX=$PWD/server-stage" -DMODULE_MOD_TWOW_ITEM_LEVEL_SCALING=static
-cmake --build build-vs --config Release --parallel
-cmake --install build-vs --config Release
-```
-
-Check each command for errors before continuing. Both builds include `mangosd`. If the configure output reports an unused module switch, verify the source placement before building. The two build sections are platform alternatives. If you already have a module checkout, use it in place of the clone. A full directory copy, a Linux symlink, or a Windows directory junction works as long as `modules/mod-twow-item-level-scaling/src/` is directly below the module directory. The module directory name determines the CMake switch and loader symbol. If reusing a build directory, keep its generator and architecture and preserve the switches for your other modules. Reconfigure after adding the module and verify CMake lists it as static.
-
-The staged world server is normally `server-stage/bin/mangosd` on Linux and `server-stage/mangosd.exe` on Windows. Stop the running world server before deploying the rebuilt executable and any required runtime libraries or module assets. Preserve the live configuration and data files. The paths below assume the standard staged layout. For an existing deployment, use the directory containing the active `mangosd.conf`, including a custom path passed via `-c`.
-
-### 3. Set up the database
-
-Back up the affected databases. The examples use `tw_char` and `tw_world` as database names. Substitute the names from the active `CharacterDatabase.Info` and `WorldDatabase.Info` settings as applicable, plus your database user and any connection options.
-
-Choose 1 import method. For the core auto-updater, verify that `Database.AutoUpdate.Enabled` and `Database.AutoUpdate.SortByName` are enabled, that `Database.AutoUpdate.AllowedModules` includes `mod-twow-item-level-scaling` (or uses `all`), and that the runtime host can access the module checkout at the source path embedded by the build. The updater uses the configured `CharUpdateName` and `WorldUpdateName` under `data/sql/` (normally `character` and `world`). Check the first startup log for applied updates. If importing manually, exclude this module from the updater allowlist to avoid replaying the same files. Preserve other modules that use automatic updates.
-
-Review the maintenance impact before import. The first script converts the core's `item_template` table to InnoDB, which can take time and lock the table. The second removes obsolete staging tables. The last creates the variant registry.
-
-**Manual import on Linux (Bash)**
-
-```bash
-mysql -u root -p tw_world < "modules/mod-twow-item-level-scaling/data/sql/world/002_convert_item_template_innodb.sql"
-mysql -u root -p tw_world < "modules/mod-twow-item-level-scaling/data/sql/world/mod_item_level_scaling_live.sql"
-mysql -u root -p tw_world < "modules/mod-twow-item-level-scaling/data/sql/world/scaled_item_variant.sql"
-```
-
-**Manual import on Windows (PowerShell)**
-
-Run `Get-Command mysql.exe` first. If it is unavailable, install the MySQL or MariaDB command-line client and add its `bin` directory to the current PowerShell session. Replace the example path below with your installation path. Use `mariadb.exe` in the import commands if that is the client you installed. Run imports in the order shown and stop if any command reports an error. `cmd.exe` handles input redirection so the SQL file reaches the client directly.
-
-```powershell
-# Only needed when mysql.exe is installed but missing from PATH
-# $env:Path = 'C:\Program Files\MySQL\MySQL Server 8.0\bin;' + $env:Path
-cmd.exe /d /c 'mysql.exe -u root -p tw_world < modules\mod-twow-item-level-scaling\data\sql\world\002_convert_item_template_innodb.sql'
-if ($LASTEXITCODE -ne 0) { throw "Module SQL import failed" }
-cmd.exe /d /c 'mysql.exe -u root -p tw_world < modules\mod-twow-item-level-scaling\data\sql\world\mod_item_level_scaling_live.sql'
-if ($LASTEXITCODE -ne 0) { throw "Module SQL import failed" }
-cmd.exe /d /c 'mysql.exe -u root -p tw_world < modules\mod-twow-item-level-scaling\data\sql\world\scaled_item_variant.sql'
-if ($LASTEXITCODE -ne 0) { throw "Module SQL import failed" }
-```
-
-### 4. Deploy and enable the configuration
-
-Create `mod-twow-item-level-scaling.conf` inside the `modules/` subdirectory beside the active `mangosd.conf`. For a first install using the example staging directory, the following commands copy the shipped template. If an active module config already exists, retain it and merge new settings from the template.
 
 **Linux**
 
 ```bash
-mkdir -p server-stage/etc/modules
-cp -n "modules/mod-twow-item-level-scaling/conf/mod-twow-item-level-scaling.conf.dist" "server-stage/etc/modules/mod-twow-item-level-scaling.conf"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMODULE_MOD_TWOW_ITEM_LEVEL_SCALING=static
+cmake --build build --parallel
 ```
 
-**Windows (PowerShell)**
+**Windows** (PowerShell, Visual Studio 2022 with C++ tools)
 
 ```powershell
-New-Item -ItemType Directory -Force 'server-stage/modules' | Out-Null
-if (-not (Test-Path 'server-stage/modules/mod-twow-item-level-scaling.conf')) {
-    Copy-Item 'modules/mod-twow-item-level-scaling/conf/mod-twow-item-level-scaling.conf.dist' 'server-stage/modules/mod-twow-item-level-scaling.conf'
-}
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DMODULE_MOD_TWOW_ITEM_LEVEL_SCALING=static
+cmake --build build --config Release --parallel
 ```
 
-Keep the template's section header and confirm `ItemScaling.Enable = 1` in the active file. Start the rebuilt server with your normal launcher and active `mangosd.conf`. Check the startup log for module configuration, database, and dependency errors.
+Preserve the CMake options for your existing server and modules. Deploy the rebuilt `mangosd` (`mangosd.exe` on Windows). Copy the module’s `conf/mod-twow-item-level-scaling.conf.dist` to `modules/mod-twow-item-level-scaling.conf` beside the active `mangosd.conf` and restart after completing any setup below.
 
-### Verify the installation
-
-Run `.itemscaling status` or `.mils status` with an authorized account. Check the startup log for registry errors before testing scaled items.
+**Database.** No manual import is needed when `Database.AutoUpdate.Enabled = 1`, `Database.AutoUpdate.AllowedModules` is `all` or includes `mod-twow-item-level-scaling`, and the server can read the module’s SQL at the source path used by the build. With the standard database folder names, the core applies `data/sql/world/` at startup. Keep `Database.AutoUpdate.SortByName = 1` and check the startup log. For a manual install, back up the affected databases, apply the files in filename order to the matching databases, and exclude this module from the updater. Back up the world database before either method. The SQL converts `item_template` to InnoDB and drops obsolete staging tables.
 
 ## 3. Chat Commands
 
