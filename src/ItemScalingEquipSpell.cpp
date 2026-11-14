@@ -74,8 +74,13 @@ namespace
         {60, 14052u}, {62, 15816u}, {64, 15817u}, {66, 15818u}, {68, 15819u}, {70, 15820u},
         {72, 15821u}, {74, 15823u}, {76, 15824u}, {78, 15825u}, {80, 15826u}, {82, 15827u},
         {84, 15828u}, {86, 15829u}, {88, 15830u}, {90, 15831u}, {92, 15832u}, {98, 28840u},
-        {100, 28735u}, {112, 45435u}, {126, 45436u}, {140, 26153u}, {154, 24994u},
-        {168, 45437u}, {182, 45438u}, {196, 45439u}, {200, 18060u}, {210, 45440u},
+        {100, 28735u}, {200, 18060u}
+    };
+
+    static const std::pair<int32, uint32> s_FAMILY_FERAL_ATTACK_POWER[] = {
+        {14, 45428u}, {28, 45429u}, {42, 45430u}, {56, 45431u}, {70, 45432u},
+        {84, 45433u}, {98, 45434u}, {112, 45435u}, {126, 45436u}, {140, 26153u},
+        {154, 24994u}, {168, 45437u}, {182, 45438u}, {196, 45439u}, {210, 45440u},
         {224, 45441u}, {238, 45442u}, {252, 45443u}, {266, 45444u}, {280, 24697u},
         {294, 45446u}, {305, 28717u}, {308, 45447u}, {322, 45448u}, {336, 51131u},
         {350, 51132u}, {364, 51133u}, {378, 51134u}, {392, 51135u}, {406, 51136u},
@@ -178,6 +183,19 @@ namespace
         {63, 26709u}, {64, 26710u}, {66, 26711u}, {67, 26712u}, {69, 26713u}, {70, 26714u}, {72, 26715u}
     };
 
+    static const std::pair<int32, uint32> s_FAMILY_SPELL_PENETRATION[] = {
+        {5, 48040u}, {6, 27516u}, {10, 25975u}, {13, 28680u}, {15, 48043u},
+        {18, 48044u}, {20, 26283u}, {25, 28799u}, {30, 48047u}
+    };
+
+    static const std::pair<int32, uint32> s_FAMILY_LEECH[] = {
+        {1, 45420u}, {2, 45421u}, {3, 45422u}, {4, 45423u}, {5, 45424u}
+    };
+
+    static const std::pair<int32, uint32> s_FAMILY_HASTE[] = {
+        {1, 13679u}, {2, 8815u}, {3, 13680u}, {4, 13681u}, {5, 13682u}, {10, 18065u}
+    };
+
     struct EquipLadderStore
     {
         std::mutex mutex;
@@ -213,6 +231,7 @@ namespace
         store.LoadCanonical(EQUIP_SPELL_FAMILY_HEALING, s_FAMILY_HEALING);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_ATTACK_POWER, s_FAMILY_ATTACK_POWER);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER, s_FAMILY_RANGED_ATTACK_POWER);
+        store.LoadCanonical(EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER, s_FAMILY_FERAL_ATTACK_POWER);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_HEALTH_REGEN, s_FAMILY_HEALTH_REGEN);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_DEFENSE, s_FAMILY_DEFENSE);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_BLOCK_VALUE, s_FAMILY_BLOCK_VALUE);
@@ -222,6 +241,9 @@ namespace
         store.LoadCanonical(EQUIP_SPELL_FAMILY_FROST_DAMAGE, s_FAMILY_FROST_DAMAGE);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_SHADOW_DAMAGE, s_FAMILY_SHADOW_DAMAGE);
         store.LoadCanonical(EQUIP_SPELL_FAMILY_ARCANE_DAMAGE, s_FAMILY_ARCANE_DAMAGE);
+        store.LoadCanonical(EQUIP_SPELL_FAMILY_SPELL_PENETRATION, s_FAMILY_SPELL_PENETRATION);
+        store.LoadCanonical(EQUIP_SPELL_FAMILY_LEECH, s_FAMILY_LEECH);
+        store.LoadCanonical(EQUIP_SPELL_FAMILY_HASTE, s_FAMILY_HASTE);
 
         for (uint32 f = 1; f < EQUIP_SPELL_FAMILY_COUNT; ++f)
         {
@@ -296,12 +318,17 @@ namespace ItemScalingEquipSpell
                 case SPELL_AURA_MOD_TARGET_RESISTANCE: // 123
                     if (misc == 1)
                         family = EQUIP_SPELL_FAMILY_ARMOR_PENETRATION;
-                    else if (misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
+                    else if (misc == 124 || misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
                         family = EQUIP_SPELL_FAMILY_SPELL_PENETRATION;
                     break;
                 case SPELL_AURA_MOD_ATTACK_POWER: // 99
                     if (misc == 0)
-                        family = EQUIP_SPELL_FAMILY_ATTACK_POWER;
+                    {
+                        if (spell->SpellName[0].find("Feral") != std::string::npos)
+                            family = EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER;
+                        else
+                            family = EQUIP_SPELL_FAMILY_ATTACK_POWER;
+                    }
                     break;
                 case SPELL_AURA_MOD_RANGED_ATTACK_POWER: // 124
                     if (misc == 0)
@@ -318,6 +345,16 @@ namespace ItemScalingEquipSpell
                 case SPELL_AURA_MOD_SHIELD_BLOCKVALUE: // 158
                     if (misc == 0)
                         family = EQUIP_SPELL_FAMILY_BLOCK_VALUE;
+                    break;
+                case SPELL_AURA_DUMMY: // 4 (Turtle WoW Leech / Vampirism)
+                    if (spell->SpellName[0].find("Vampirism") != std::string::npos)
+                        family = EQUIP_SPELL_FAMILY_LEECH;
+                    break;
+                case SPELL_AURA_MOD_HASTE: // 138 (Turtle WoW Passive Haste)
+                case SPELL_AURA_MOD_SPEED_ALWAYS: // 140
+                case SPELL_AURA_MOD_ATTACK_SPEED: // 65
+                    if (spell->SpellName[0].find("Haste") != std::string::npos)
+                        family = EQUIP_SPELL_FAMILY_HASTE;
                     break;
                 default:
                     break;
@@ -349,7 +386,10 @@ namespace ItemScalingEquipSpell
                     legitimate = (sname.find("Armor Penetration") != std::string::npos);
                     break;
                 case EQUIP_SPELL_FAMILY_ATTACK_POWER:
-                    legitimate = (sname.find("Attack Power") != std::string::npos);
+                    legitimate = (sname.find("Attack Power") != std::string::npos && sname.find("Feral") == std::string::npos && sname.find("Ranged") == std::string::npos);
+                    break;
+                case EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER:
+                    legitimate = (sname.find("Attack Power") != std::string::npos && sname.find("Feral") != std::string::npos);
                     break;
                 case EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER:
                     legitimate = (sname.find("Attack Power Ranged") != std::string::npos || sname.find("Ranged Attack Power") != std::string::npos);
@@ -370,6 +410,15 @@ namespace ItemScalingEquipSpell
                 case EQUIP_SPELL_FAMILY_SHADOW_DAMAGE:
                 case EQUIP_SPELL_FAMILY_ARCANE_DAMAGE:
                     legitimate = (sname.find("Dam ") != std::string::npos || sname.find("Damage") != std::string::npos);
+                    break;
+                case EQUIP_SPELL_FAMILY_SPELL_PENETRATION:
+                    legitimate = (sname.find("Spell Penetration") != std::string::npos);
+                    break;
+                case EQUIP_SPELL_FAMILY_LEECH:
+                    legitimate = (sname.find("Vampirism") != std::string::npos);
+                    break;
+                case EQUIP_SPELL_FAMILY_HASTE:
+                    legitimate = (sname.find("Haste") != std::string::npos);
                     break;
                 default:
                     legitimate = true;
@@ -459,11 +508,17 @@ namespace ItemScalingEquipSpell
             case SPELL_AURA_MOD_TARGET_RESISTANCE:
                 if (misc == 1)
                     return EQUIP_SPELL_FAMILY_ARMOR_PENETRATION;
-                if (misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
+                if (misc == 124 || misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
                     return EQUIP_SPELL_FAMILY_SPELL_PENETRATION;
                 return EQUIP_SPELL_FAMILY_NONE;
             case SPELL_AURA_MOD_ATTACK_POWER:
-                return (misc == 0) ? EQUIP_SPELL_FAMILY_ATTACK_POWER : EQUIP_SPELL_FAMILY_NONE;
+                if (misc == 0)
+                {
+                    if (spell->SpellName[0].find("Feral") != std::string::npos)
+                        return EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER;
+                    return EQUIP_SPELL_FAMILY_ATTACK_POWER;
+                }
+                return EQUIP_SPELL_FAMILY_NONE;
             case SPELL_AURA_MOD_RANGED_ATTACK_POWER:
                 return (misc == 0) ? EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER : EQUIP_SPELL_FAMILY_NONE;
             case SPELL_AURA_MOD_HEALTH_REGEN_PERCENT:
@@ -472,6 +527,16 @@ namespace ItemScalingEquipSpell
                 return (misc == 95) ? EQUIP_SPELL_FAMILY_DEFENSE : EQUIP_SPELL_FAMILY_NONE;
             case SPELL_AURA_MOD_SHIELD_BLOCKVALUE:
                 return (misc == 0) ? EQUIP_SPELL_FAMILY_BLOCK_VALUE : EQUIP_SPELL_FAMILY_NONE;
+            case SPELL_AURA_DUMMY:
+                if (spell->SpellName[0].find("Vampirism") != std::string::npos)
+                    return EQUIP_SPELL_FAMILY_LEECH;
+                return EQUIP_SPELL_FAMILY_NONE;
+            case SPELL_AURA_MOD_HASTE:
+            case SPELL_AURA_MOD_SPEED_ALWAYS:
+            case SPELL_AURA_MOD_ATTACK_SPEED:
+                if (spell->SpellName[0].find("Haste") != std::string::npos)
+                    return EQUIP_SPELL_FAMILY_HASTE;
+                return EQUIP_SPELL_FAMILY_NONE;
             default:
                 return EQUIP_SPELL_FAMILY_NONE;
         }
@@ -507,6 +572,7 @@ namespace ItemScalingEquipSpell
             case EQUIP_SPELL_FAMILY_ARMOR_PENETRATION:    return "Armor Penetration";
             case EQUIP_SPELL_FAMILY_ATTACK_POWER:         return "Attack Power";
             case EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER:  return "Ranged Attack Power";
+            case EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER:   return "Feral Attack Power";
             case EQUIP_SPELL_FAMILY_HEALTH_REGEN:         return "Health Regen (HP5)";
             case EQUIP_SPELL_FAMILY_DEFENSE:              return "Defense Rating";
             case EQUIP_SPELL_FAMILY_BLOCK_VALUE:          return "Shield Block Value";
@@ -517,6 +583,8 @@ namespace ItemScalingEquipSpell
             case EQUIP_SPELL_FAMILY_SHADOW_DAMAGE:        return "Shadow Spell Damage";
             case EQUIP_SPELL_FAMILY_ARCANE_DAMAGE:        return "Arcane Spell Damage";
             case EQUIP_SPELL_FAMILY_SPELL_PENETRATION:    return "Spell Penetration";
+            case EQUIP_SPELL_FAMILY_LEECH:                return "Leech (Vampirism)";
+            case EQUIP_SPELL_FAMILY_HASTE:                return "Passive Haste";
             default:                                      return "None";
         }
     }

@@ -215,6 +215,12 @@ namespace ItemScalingFormula
             return false;
         }
 
+        // Exclude account-bound items (Turtle WoW BIND_ACCOUNT = 6)
+        if (proto->Bonding == 6)
+        {
+            return false;
+        }
+
         // Exclude qualities based on config
         if (!sItemScalingConfig->IsQualityEnabled(proto->Quality))
         {
@@ -377,6 +383,18 @@ namespace ItemScalingFormula
                                     return false; // Unsupported stat type
                             }
                             types.insert(itemMod);
+                            supportedAuraFound = true;
+                            hasBonus = true;
+                        }
+                        else if (aura == SPELL_AURA_MOD_INCREASE_HEALTH)
+                        {
+                            types.insert(ITEM_MOD_HEALTH);
+                            supportedAuraFound = true;
+                            hasBonus = true;
+                        }
+                        else if (aura == SPELL_AURA_MOD_INCREASE_MANA)
+                        {
+                            types.insert(ITEM_MOD_MANA);
                             supportedAuraFound = true;
                             hasBonus = true;
                         }
@@ -697,6 +715,20 @@ namespace ItemScalingFormula
                             }
 
                             if (!applyStat(stat, value))
+                            {
+                                return false;
+                            }
+                        }
+                        else if (aura == SPELL_AURA_MOD_INCREASE_HEALTH)
+                        {
+                            if (!applyStat(ITEM_MOD_HEALTH, value))
+                            {
+                                return false;
+                            }
+                        }
+                        else if (aura == SPELL_AURA_MOD_INCREASE_MANA)
+                        {
+                            if (!applyStat(ITEM_MOD_MANA, value))
                             {
                                 return false;
                             }
