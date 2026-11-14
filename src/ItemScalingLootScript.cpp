@@ -578,6 +578,11 @@ void ItemScalingLootScript::PrepareLoot(Loot* loot, Player* lootOwner, Creature 
             }
             if (randomPropId == 0 || !ItemScalingFormula::CanBakeRandomProperty(*baseProto, randomPropId))
             {
+                if (sItemScalingConfig->Debug && !prewarm)
+                {
+                    sLog.outString("[ItemScaling] Skipped item %u '%s' (Random suffix %d cannot be baked)",
+                        baseProto->ItemId, baseProto->Name1.c_str(), randomPropId);
+                }
                 continue;
             }
         }

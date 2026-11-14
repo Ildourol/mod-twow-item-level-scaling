@@ -305,6 +305,16 @@ namespace ItemScalingFormula
             }
         }
 
+        uint32 existingSpells = 0;
+        for (uint32 s = 0; s < MAX_ITEM_PROTO_SPELLS; ++s)
+        {
+            if (base.Spells[s].SpellId != 0)
+            {
+                ++existingSpells;
+            }
+        }
+
+        uint32 neededSpells = 0;
         bool hasBonus = false;
         for (uint32 k = 0; k < 3; ++k)
         {
@@ -383,6 +393,13 @@ namespace ItemScalingFormula
                                 return false;
                             }
                         }
+                        else if (ItemScalingEquipSpell::IsScalableEquipSpell(spellId))
+                        {
+                            supportedAuraFound = true;
+                            hasBonus = true;
+                            ++neededSpells;
+                            break; // Handled as an equip spell on the prototype; don't count extra effects of same spell
+                        }
                         else
                         {
                             // Procs, spells, combat effects cannot be baked cleanly into raw stats
@@ -423,7 +440,8 @@ namespace ItemScalingFormula
             }
         }
 
-        return hasBonus && types.size() <= MAX_ITEM_PROTO_STATS;
+        return hasBonus && types.size() <= MAX_ITEM_PROTO_STATS &&
+               (existingSpells + neededSpells <= MAX_ITEM_PROTO_SPELLS);
     }
 
     bool IsValidBakedTemplate(ItemPrototype const& base, ItemPrototype const& scaled, int32 randomPropertyId)
@@ -589,6 +607,56 @@ namespace ItemScalingFormula
                     if (!spell)
                     {
                         return false;
+                    }
+
+                    // Check if this spell is a scalable equip effect (attack power, spell damage, healing, etc.)
+                    bool isEquipSpell = false;
+                    for (uint32 eff = 0; eff < 3; ++eff)
+                    {
+                        if (!spell->Effect[eff])
+                        {
+                            continue;
+                        }
+                        uint32 aura = spell->EffectApplyAuraName[eff];
+                        if (aura != SPELL_AURA_MOD_STAT && aura != SPELL_AURA_MOD_RESISTANCE &&
+                            ItemScalingEquipSpell::IsScalableEquipSpell(spellId))
+                        {
+                            isEquipSpell = true;
+                            break;
+                        }
+                    }
+
+                    if (isEquipSpell)
+                    {
+                        uint32 scaledSpellId = ItemScalingEquipSpell::FindScaledEquipSpell(spellId, rBudget);
+                        if (scaledSpellId == 0)
+                        {
+                            scaledSpellId = spellId;
+                        }
+
+                        int32 spellSlot = -1;
+                        for (int32 s = 0; s < MAX_ITEM_PROTO_SPELLS; ++s)
+                        {
+                            if (baked.Spells[s].SpellId == 0)
+                            {
+                                spellSlot = s;
+                                break;
+                            }
+                        }
+
+                        if (spellSlot == -1)
+                        {
+                            return false;
+                        }
+
+                        baked.Spells[spellSlot].SpellId = scaledSpellId;
+                        baked.Spells[spellSlot].SpellTrigger = ITEM_SPELLTRIGGER_ON_EQUIP;
+                        baked.Spells[spellSlot].SpellCharges = 0;
+                        baked.Spells[spellSlot].SpellPPMRate = 0.0f;
+                        baked.Spells[spellSlot].SpellCooldown = -1;
+                        baked.Spells[spellSlot].SpellCategory = 0;
+                        baked.Spells[spellSlot].SpellCategoryCooldown = -1;
+                        continue;
                     }
 
                     for (uint32 eff = 0; eff < 3; ++eff)
