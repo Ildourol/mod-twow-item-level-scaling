@@ -350,9 +350,10 @@ namespace ItemScalingEquipSpell
                     if (spell->SpellName[0].find("Vampirism") != std::string::npos)
                         family = EQUIP_SPELL_FAMILY_LEECH;
                     break;
-                case SPELL_AURA_MOD_HASTE: // 138 (Turtle WoW Passive Haste)
-                case SPELL_AURA_MOD_SPEED_ALWAYS: // 140
-                case SPELL_AURA_MOD_ATTACK_SPEED: // 65
+                case SPELL_AURA_MOD_ATTACKSPEED: // 9
+                case SPELL_AURA_MOD_CASTING_SPEED_NOT_STACK: // 65
+                case SPELL_AURA_MOD_MELEE_HASTE: // 138 (Turtle WoW Passive Haste)
+                case SPELL_AURA_MOD_RANGED_HASTE: // 140
                     if (spell->SpellName[0].find("Haste") != std::string::npos)
                         family = EQUIP_SPELL_FAMILY_HASTE;
                     break;
@@ -531,9 +532,10 @@ namespace ItemScalingEquipSpell
                 if (spell->SpellName[0].find("Vampirism") != std::string::npos)
                     return EQUIP_SPELL_FAMILY_LEECH;
                 return EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_HASTE:
-            case SPELL_AURA_MOD_SPEED_ALWAYS:
-            case SPELL_AURA_MOD_ATTACK_SPEED:
+            case SPELL_AURA_MOD_ATTACKSPEED:
+            case SPELL_AURA_MOD_CASTING_SPEED_NOT_STACK:
+            case SPELL_AURA_MOD_MELEE_HASTE:
+            case SPELL_AURA_MOD_RANGED_HASTE:
                 if (spell->SpellName[0].find("Haste") != std::string::npos)
                     return EQUIP_SPELL_FAMILY_HASTE;
                 return EQUIP_SPELL_FAMILY_NONE;

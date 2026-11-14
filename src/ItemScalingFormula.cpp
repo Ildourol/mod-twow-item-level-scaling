@@ -392,7 +392,7 @@ namespace ItemScalingFormula
                             supportedAuraFound = true;
                             hasBonus = true;
                         }
-                        else if (aura == SPELL_AURA_MOD_INCREASE_MANA)
+                        else if (aura == SPELL_AURA_MOD_INCREASE_ENERGY)
                         {
                             types.insert(ITEM_MOD_MANA);
                             supportedAuraFound = true;
@@ -726,7 +726,7 @@ namespace ItemScalingFormula
                                 return false;
                             }
                         }
-                        else if (aura == SPELL_AURA_MOD_INCREASE_MANA)
+                        else if (aura == SPELL_AURA_MOD_INCREASE_ENERGY)
                         {
                             if (!applyStat(ITEM_MOD_MANA, value))
                             {
