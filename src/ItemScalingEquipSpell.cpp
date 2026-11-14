@@ -288,83 +288,97 @@ namespace ItemScalingEquipSpell
                 continue;
 
             EquipSpellFamily family = EQUIP_SPELL_FAMILY_NONE;
-            uint32 aura = spell->EffectApplyAuraName[0];
-            int32 misc = spell->EffectMiscValue[0];
+            int32 statEffectIndex = -1;
 
-            switch (aura)
+            for (uint32 eff = 0; eff < 3; ++eff)
             {
-                case SPELL_AURA_MOD_DAMAGE_DONE: // 13
+                if (!spell->Effect[eff])
+                    continue;
+
+                uint32 aura = spell->EffectApplyAuraName[eff];
+                int32 misc = spell->EffectMiscValue[eff];
+
+                switch (aura)
                 {
-                    switch (misc)
+                    case SPELL_AURA_MOD_DAMAGE_DONE: // 13
                     {
-                        case 126: family = EQUIP_SPELL_FAMILY_SPELL_DAMAGE; break;
-                        case 2:   family = EQUIP_SPELL_FAMILY_HOLY_DAMAGE; break;
-                        case 4:   family = EQUIP_SPELL_FAMILY_FIRE_DAMAGE; break;
-                        case 8:   family = EQUIP_SPELL_FAMILY_NATURE_DAMAGE; break;
-                        case 16:  family = EQUIP_SPELL_FAMILY_FROST_DAMAGE; break;
-                        case 32:  family = EQUIP_SPELL_FAMILY_SHADOW_DAMAGE; break;
-                        case 64:  family = EQUIP_SPELL_FAMILY_ARCANE_DAMAGE; break;
-                        default:  break;
+                        switch (misc)
+                        {
+                            case 126: family = EQUIP_SPELL_FAMILY_SPELL_DAMAGE; break;
+                            case 2:   family = EQUIP_SPELL_FAMILY_HOLY_DAMAGE; break;
+                            case 4:   family = EQUIP_SPELL_FAMILY_FIRE_DAMAGE; break;
+                            case 8:   family = EQUIP_SPELL_FAMILY_NATURE_DAMAGE; break;
+                            case 16:  family = EQUIP_SPELL_FAMILY_FROST_DAMAGE; break;
+                            case 32:  family = EQUIP_SPELL_FAMILY_SHADOW_DAMAGE; break;
+                            case 64:  family = EQUIP_SPELL_FAMILY_ARCANE_DAMAGE; break;
+                            default:  break;
+                        }
+                        break;
                     }
+                    case SPELL_AURA_MOD_HEALING_DONE: // 135
+                        family = EQUIP_SPELL_FAMILY_HEALING;
+                        break;
+                    case SPELL_AURA_MOD_POWER_REGEN: // 85
+                        if (misc == 0)
+                            family = EQUIP_SPELL_FAMILY_MANA_REGEN;
+                        break;
+                    case SPELL_AURA_MOD_TARGET_RESISTANCE: // 123
+                        if (misc == 1)
+                            family = EQUIP_SPELL_FAMILY_ARMOR_PENETRATION;
+                        else if (misc == 124 || misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
+                            family = EQUIP_SPELL_FAMILY_SPELL_PENETRATION;
+                        break;
+                    case SPELL_AURA_MOD_ATTACK_POWER: // 99
+                        if (misc == 0)
+                        {
+                            if (spell->SpellName[0].find("Feral") != std::string::npos)
+                                family = EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER;
+                            else
+                                family = EQUIP_SPELL_FAMILY_ATTACK_POWER;
+                        }
+                        break;
+                    case SPELL_AURA_MOD_RANGED_ATTACK_POWER: // 124
+                        if (misc == 0)
+                            family = EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER;
+                        break;
+                    case SPELL_AURA_MOD_HEALTH_REGEN_PERCENT: // 161
+                        if (misc == 0)
+                            family = EQUIP_SPELL_FAMILY_HEALTH_REGEN;
+                        break;
+                    case SPELL_AURA_MOD_SKILL: // 30
+                        if (misc == 95) // SKILL_DEFENSE
+                            family = EQUIP_SPELL_FAMILY_DEFENSE;
+                        break;
+                    case SPELL_AURA_MOD_SHIELD_BLOCKVALUE: // 158
+                        if (misc == 0)
+                            family = EQUIP_SPELL_FAMILY_BLOCK_VALUE;
+                        break;
+                    case SPELL_AURA_DUMMY: // 4 (Turtle WoW Leech / Vampirism)
+                        if (spell->SpellName[0].find("Vampirism") != std::string::npos)
+                            family = EQUIP_SPELL_FAMILY_LEECH;
+                        break;
+                    case SPELL_AURA_MOD_ATTACKSPEED: // 9
+                    case SPELL_AURA_MOD_CASTING_SPEED_NOT_STACK: // 65
+                    case SPELL_AURA_MOD_MELEE_HASTE: // 138 (Turtle WoW Passive Haste)
+                    case SPELL_AURA_MOD_RANGED_HASTE: // 140
+                        if (spell->SpellName[0].find("Haste") != std::string::npos)
+                            family = EQUIP_SPELL_FAMILY_HASTE;
+                        break;
+                    default:
+                        break;
+                }
+
+                if (family != EQUIP_SPELL_FAMILY_NONE)
+                {
+                    statEffectIndex = static_cast<int32>(eff);
                     break;
                 }
-                case SPELL_AURA_MOD_HEALING_DONE: // 135
-                    family = EQUIP_SPELL_FAMILY_HEALING;
-                    break;
-                case SPELL_AURA_MOD_POWER_REGEN: // 85
-                    if (misc == 0)
-                        family = EQUIP_SPELL_FAMILY_MANA_REGEN;
-                    break;
-                case SPELL_AURA_MOD_TARGET_RESISTANCE: // 123
-                    if (misc == 1)
-                        family = EQUIP_SPELL_FAMILY_ARMOR_PENETRATION;
-                    else if (misc == 124 || misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
-                        family = EQUIP_SPELL_FAMILY_SPELL_PENETRATION;
-                    break;
-                case SPELL_AURA_MOD_ATTACK_POWER: // 99
-                    if (misc == 0)
-                    {
-                        if (spell->SpellName[0].find("Feral") != std::string::npos)
-                            family = EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER;
-                        else
-                            family = EQUIP_SPELL_FAMILY_ATTACK_POWER;
-                    }
-                    break;
-                case SPELL_AURA_MOD_RANGED_ATTACK_POWER: // 124
-                    if (misc == 0)
-                        family = EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER;
-                    break;
-                case SPELL_AURA_MOD_HEALTH_REGEN_PERCENT: // 161
-                    if (misc == 0)
-                        family = EQUIP_SPELL_FAMILY_HEALTH_REGEN;
-                    break;
-                case SPELL_AURA_MOD_SKILL: // 30
-                    if (misc == 95) // SKILL_DEFENSE
-                        family = EQUIP_SPELL_FAMILY_DEFENSE;
-                    break;
-                case SPELL_AURA_MOD_SHIELD_BLOCKVALUE: // 158
-                    if (misc == 0)
-                        family = EQUIP_SPELL_FAMILY_BLOCK_VALUE;
-                    break;
-                case SPELL_AURA_DUMMY: // 4 (Turtle WoW Leech / Vampirism)
-                    if (spell->SpellName[0].find("Vampirism") != std::string::npos)
-                        family = EQUIP_SPELL_FAMILY_LEECH;
-                    break;
-                case SPELL_AURA_MOD_ATTACKSPEED: // 9
-                case SPELL_AURA_MOD_CASTING_SPEED_NOT_STACK: // 65
-                case SPELL_AURA_MOD_MELEE_HASTE: // 138 (Turtle WoW Passive Haste)
-                case SPELL_AURA_MOD_RANGED_HASTE: // 140
-                    if (spell->SpellName[0].find("Haste") != std::string::npos)
-                        family = EQUIP_SPELL_FAMILY_HASTE;
-                    break;
-                default:
-                    break;
             }
 
-            if (family == EQUIP_SPELL_FAMILY_NONE)
+            if (family == EQUIP_SPELL_FAMILY_NONE || statEffectIndex < 0)
                 continue;
 
-            int32 val = std::abs(spell->EffectBasePoints[0] + 1);
+            int32 val = std::abs(spell->EffectBasePoints[statEffectIndex] + 1);
             if (val <= 0)
                 continue;
 

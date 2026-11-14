@@ -292,6 +292,6 @@ uint16 ItemScalingBaseline::CalculateTargetItemLevel(ItemPrototype const* basePr
         targetIlvl = std::round(static_cast<double>(i0) * static_cast<double>(lTarget) / static_cast<double>(std::max<uint8>(1, l0)));
     }
 
-    uint16 clampedIlvl = static_cast<uint16>(std::clamp<int32>(static_cast<int32>(targetIlvl), 1, 300));
+    uint16 clampedIlvl = static_cast<uint16>(std::clamp<int32>(static_cast<int32>(targetIlvl), 1, 255));
     return clampedIlvl;
 }

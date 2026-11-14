@@ -99,8 +99,7 @@ namespace ItemScalingFormula
 
         double scaled = static_cast<double>(v0) * r;
         int32 v1 = static_cast<int32>(std::clamp(std::round(scaled),
-            static_cast<double>(std::numeric_limits<int32>::min()),
-            static_cast<double>(std::numeric_limits<int32>::max())));
+            -32768.0, 32767.0));
 
         if (preserveNonZero && v1 == 0)
         {
@@ -119,12 +118,12 @@ namespace ItemScalingFormula
 
         if (l0 == lTarget || rBudget <= 0.0)
         {
-            return static_cast<uint32>(std::max<int32>(0, baseProto->Armor));
+            return static_cast<uint32>(std::clamp<int32>(baseProto->Armor, 0, 65535));
         }
 
         double scaled = static_cast<double>(baseProto->Armor) * rBudget;
         return static_cast<uint32>(std::clamp(std::round(scaled),
-            1.0, static_cast<double>(std::numeric_limits<uint32>::max())));
+            1.0, 65535.0));
     }
 
     void ScaleWeaponDamage(ItemPrototype const* baseProto, ItemPrototype& scaledProto, double rBudget, uint8 l0, uint8 lTarget)
@@ -507,11 +506,11 @@ namespace ItemScalingFormula
             baked.Name1 = baseProto->Name1 + " " + suffixName;
         }
 
-        auto accumulate = [](int32& current, int64 amount, bool resistance)
+        auto accumulate = [](int32& current, int64 amount, bool /*resistance*/)
         {
             int64 sum = int64(current) + amount;
-            int64 minimum = resistance ? std::numeric_limits<int16>::min() : std::numeric_limits<int32>::min();
-            int64 maximum = resistance ? std::numeric_limits<int16>::max() : std::numeric_limits<int32>::max();
+            int64 minimum = -32768; // MySQL smallint(6) boundary
+            int64 maximum = 32767;
             if (sum < minimum || sum > maximum)
             {
                 return false;
@@ -556,26 +555,34 @@ namespace ItemScalingFormula
             return accumulate(baked.ItemStat[slot].ItemStatValue, value, false);
         };
 
-        auto applyResistance = [&](int32 schoolOrMisc, int64 value) -> bool
+        auto applyResistanceSchool = [&](uint32 school, int64 value) -> bool
         {
             if (!value)
             {
                 return true;
             }
 
-            if (schoolOrMisc == (1 << SPELL_SCHOOL_HOLY) || schoolOrMisc == SPELL_SCHOOL_HOLY)
-                return accumulate(baked.HolyRes, value, true);
-            if (schoolOrMisc == (1 << SPELL_SCHOOL_FIRE) || schoolOrMisc == SPELL_SCHOOL_FIRE)
-                return accumulate(baked.FireRes, value, true);
-            if (schoolOrMisc == (1 << SPELL_SCHOOL_NATURE) || schoolOrMisc == SPELL_SCHOOL_NATURE)
-                return accumulate(baked.NatureRes, value, true);
-            if (schoolOrMisc == (1 << SPELL_SCHOOL_FROST) || schoolOrMisc == SPELL_SCHOOL_FROST)
-                return accumulate(baked.FrostRes, value, true);
-            if (schoolOrMisc == (1 << SPELL_SCHOOL_SHADOW) || schoolOrMisc == SPELL_SCHOOL_SHADOW)
-                return accumulate(baked.ShadowRes, value, true);
-            if (schoolOrMisc == (1 << SPELL_SCHOOL_ARCANE) || schoolOrMisc == SPELL_SCHOOL_ARCANE)
-                return accumulate(baked.ArcaneRes, value, true);
-            if (schoolOrMisc == 126) // All magic schools
+            switch (school)
+            {
+                case SPELL_SCHOOL_NORMAL: return accumulate(baked.Armor, value, false);
+                case SPELL_SCHOOL_HOLY:   return accumulate(baked.HolyRes, value, true);
+                case SPELL_SCHOOL_FIRE:   return accumulate(baked.FireRes, value, true);
+                case SPELL_SCHOOL_NATURE: return accumulate(baked.NatureRes, value, true);
+                case SPELL_SCHOOL_FROST:  return accumulate(baked.FrostRes, value, true);
+                case SPELL_SCHOOL_SHADOW: return accumulate(baked.ShadowRes, value, true);
+                case SPELL_SCHOOL_ARCANE: return accumulate(baked.ArcaneRes, value, true);
+                default: return false;
+            }
+        };
+
+        auto applyResistanceMask = [&](uint32 mask, int64 value) -> bool
+        {
+            if (!value)
+            {
+                return true;
+            }
+
+            if (mask == 126) // All magic schools
             {
                 return accumulate(baked.HolyRes, value, true) &&
                        accumulate(baked.FireRes, value, true) &&
@@ -584,10 +591,22 @@ namespace ItemScalingFormula
                        accumulate(baked.ShadowRes, value, true) &&
                        accumulate(baked.ArcaneRes, value, true);
             }
-            if (schoolOrMisc == 1 || schoolOrMisc == SPELL_SCHOOL_NORMAL || schoolOrMisc == 0)
-            {
+
+            if (mask == (1u << SPELL_SCHOOL_NORMAL))
                 return accumulate(baked.Armor, value, false);
-            }
+            if (mask == (1u << SPELL_SCHOOL_HOLY))
+                return accumulate(baked.HolyRes, value, true);
+            if (mask == (1u << SPELL_SCHOOL_FIRE))
+                return accumulate(baked.FireRes, value, true);
+            if (mask == (1u << SPELL_SCHOOL_NATURE))
+                return accumulate(baked.NatureRes, value, true);
+            if (mask == (1u << SPELL_SCHOOL_FROST))
+                return accumulate(baked.FrostRes, value, true);
+            if (mask == (1u << SPELL_SCHOOL_SHADOW))
+                return accumulate(baked.ShadowRes, value, true);
+            if (mask == (1u << SPELL_SCHOOL_ARCANE))
+                return accumulate(baked.ArcaneRes, value, true);
+
             return false;
         };
 
@@ -728,14 +747,17 @@ namespace ItemScalingFormula
                         }
                         else if (aura == SPELL_AURA_MOD_INCREASE_ENERGY)
                         {
-                            if (!applyStat(ITEM_MOD_MANA, value))
+                            if (misc == 0) // POWER_MANA only
                             {
-                                return false;
+                                if (!applyStat(ITEM_MOD_MANA, value))
+                                {
+                                    return false;
+                                }
                             }
                         }
                         else if (aura == SPELL_AURA_MOD_RESISTANCE)
                         {
-                            if (!applyResistance(misc, value))
+                            if (!applyResistanceMask(misc, value))
                             {
                                 return false;
                             }
@@ -781,7 +803,7 @@ namespace ItemScalingFormula
                     }
 
                     int64 value = static_cast<int64>(amount);
-                    if (!applyResistance(ench->spellid[i], value))
+                    if (!applyResistanceSchool(ench->spellid[i], value))
                     {
                         return false;
                     }

@@ -83,6 +83,11 @@ bool ItemScalingLive::RecoverStagedTemplates()
 
 bool ItemScalingLive::ReserveSlots()
 {
+    if (sItemScalingConfig->LiveReservedSlots > 0)
+    {
+        auto& prototypeMap = const_cast<ItemPrototypeMap&>(sObjectMgr.GetItemPrototypeMap());
+        prototypeMap.reserve(prototypeMap.size() + sItemScalingConfig->LiveReservedSlots);
+    }
     return true;
 }
 
@@ -92,6 +97,7 @@ void ItemScalingLive::IncludeOwnedEntries(std::unordered_set<uint32>& /*entries*
 
 void ItemScalingLive::Initialize()
 {
+    ReserveSlots();
     _impl->enabled = sItemScalingConfig->LiveEnable && sItemScalingRegistry->IsInitialized() &&
         _impl->LoadCatalogue();
 }

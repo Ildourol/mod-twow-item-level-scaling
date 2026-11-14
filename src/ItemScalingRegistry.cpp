@@ -477,7 +477,7 @@ void ItemScalingRegistry::Initialize()
                 continue;
             }
 
-            if (persisted->RequiredLevel != key.requiredLevel || persisted->ItemLevel != key.targetItemLevel)
+            if (persisted->RequiredLevel != key.requiredLevel || persisted->ItemLevel != std::min<uint16>(key.targetItemLevel, 255))
             {
                 ++invalid;
                 continue;
@@ -592,8 +592,12 @@ uint32 ItemScalingRegistry::GenerateAndPersistLiveVariant(ItemPrototype const* b
     ItemPrototype scaledProto = ItemScalingFormula::CreateScaledTemplate(baseProto, newEntry, key.targetEffectiveLevel, key.targetItemLevel, key.formulaVersion, highestRealPlayerLevel, key.randomPropertyId);
 
     // Direct in-memory prototype registration into sObjectMgr
-    auto& prototypeMap = const_cast<ItemPrototypeMap&>(sObjectMgr.GetItemPrototypeMap());
-    prototypeMap[newEntry] = scaledProto;
+    static std::mutex sPrototypeMapMutex;
+    {
+        std::lock_guard<std::mutex> lock(sPrototypeMapMutex);
+        auto& prototypeMap = const_cast<ItemPrototypeMap&>(sObjectMgr.GetItemPrototypeMap());
+        prototypeMap[newEntry] = scaledProto;
+    }
 
     // Direct SQL persistence: write complete 130-column template into item_template
     std::string itemSql = ItemScalingSnapshot::Insert(scaledProto, "item_template");
