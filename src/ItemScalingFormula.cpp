@@ -393,9 +393,16 @@ namespace ItemScalingFormula
                         }
                         else if (aura == SPELL_AURA_MOD_INCREASE_ENERGY)
                         {
-                            types.insert(ITEM_MOD_MANA);
-                            supportedAuraFound = true;
-                            hasBonus = true;
+                            if (misc == 0) // POWER_MANA only
+                            {
+                                types.insert(ITEM_MOD_MANA);
+                                supportedAuraFound = true;
+                                hasBonus = true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else if (aura == SPELL_AURA_MOD_RESISTANCE)
                         {

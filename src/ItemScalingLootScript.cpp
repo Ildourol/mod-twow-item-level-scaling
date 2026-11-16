@@ -731,7 +731,10 @@ namespace
         {
             if (player && player->GetSession())
             {
-                player->GetSession()->AddScript("ItemScalingSessionScript", new ItemScalingSessionScript(player->GetSession()));
+                if (!player->GetSession()->GetScriptByName("ItemScalingSessionScript"))
+                {
+                    player->GetSession()->AddScript("ItemScalingSessionScript", new ItemScalingSessionScript(player->GetSession()));
+                }
             }
         }
 

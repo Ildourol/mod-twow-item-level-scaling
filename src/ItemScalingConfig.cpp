@@ -263,6 +263,7 @@ void ItemScalingConfig::Load(bool reload)
     std::string excludedMaps = sConfig.GetStringDefault("ItemScaling.ExcludedMapIds", "");
     if (!excludedMaps.empty())
     {
+        std::replace(excludedMaps.begin(), excludedMaps.end(), ',', ' ');
         std::stringstream ss(excludedMaps);
         uint32 id;
         while (ss >> id)
@@ -273,6 +274,7 @@ void ItemScalingConfig::Load(bool reload)
     std::string excludedItems = sConfig.GetStringDefault("ItemScaling.ExcludedItemIds", "");
     if (!excludedItems.empty())
     {
+        std::replace(excludedItems.begin(), excludedItems.end(), ',', ' ');
         std::stringstream ss(excludedItems);
         uint32 id;
         while (ss >> id)

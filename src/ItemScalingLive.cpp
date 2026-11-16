@@ -517,18 +517,7 @@ namespace
     class ItemScalingLiveServerScript : public ServerScript
     {
     public:
-        ItemScalingLiveServerScript() : ServerScript("ItemScalingLiveServerScript",
-            {SERVERHOOK_CAN_PACKET_RECEIVE, SERVERHOOK_CAN_PACKET_SEND}) { }
-
-        bool CanPacketReceive(WorldSession* /*session*/, WorldPacket const& /*packet*/) override
-        {
-            return true;
-        }
-
-        bool CanPacketSend(WorldSession* /*session*/, WorldPacket const& /*packet*/) override
-        {
-            return true;
-        }
+        ItemScalingLiveServerScript() : ServerScript("ItemScalingLiveServerScript", {}) { }
     };
 
     class ItemScalingLiveMapScript : public AllMapScript

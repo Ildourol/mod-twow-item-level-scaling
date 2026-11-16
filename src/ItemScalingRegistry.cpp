@@ -587,9 +587,18 @@ uint32 ItemScalingRegistry::GenerateAndPersistLiveVariant(ItemPrototype const* b
         return 0;
     }
 
-    uint32 newEntry = static_cast<uint32>(_nextSyntheticEntry++);
+    uint32 newEntry = static_cast<uint32>(_nextSyntheticEntry);
 
     ItemPrototype scaledProto = ItemScalingFormula::CreateScaledTemplate(baseProto, newEntry, key.targetEffectiveLevel, key.targetItemLevel, key.formulaVersion, highestRealPlayerLevel, key.randomPropertyId);
+
+    if (!ItemScalingFormula::IsValidBakedTemplate(*baseProto, scaledProto, key.randomPropertyId))
+    {
+        sLog.outError("[ItemScaling] Scaled template generation produced invalid template for base %u (target entry %u).",
+            baseProto->ItemId, newEntry);
+        return 0;
+    }
+
+    ++_nextSyntheticEntry;
 
     // Direct in-memory prototype registration into sObjectMgr
     static std::mutex sPrototypeMapMutex;
@@ -605,7 +614,7 @@ uint32 ItemScalingRegistry::GenerateAndPersistLiveVariant(ItemPrototype const* b
 
     // Direct SQL persistence: write variant identity into scaled_item_variant
     ItemScalingIdentity id = ItemScalingIdentity::Capture(*baseProto);
-    WorldDatabase.PExecute(
+    WorldDatabase.DirectPExecute(
         "INSERT INTO scaled_item_variant (variant_entry, base_entry, target_effective_level, target_item_level, "
         "formula_version, generator_revision, required_level, random_property_id, base_class, base_subclass, "
         "base_sound_override_subclass, base_material, base_displayid, base_inventory_type, base_sheath, preserve_nonzero_stats) "

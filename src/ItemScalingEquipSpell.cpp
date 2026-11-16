@@ -499,63 +499,103 @@ namespace ItemScalingEquipSpell
         if (spell->DurationIndex != 0 && spell->DurationIndex != 21)
             return EQUIP_SPELL_FAMILY_NONE;
 
-        uint32 aura = spell->EffectApplyAuraName[0];
-        int32 misc = spell->EffectMiscValue[0];
+        EquipSpellFamily family = EQUIP_SPELL_FAMILY_NONE;
+        int32 foundBaseVal = 0;
 
-        switch (aura)
+        for (uint32 eff = 0; eff < 3; ++eff)
         {
-            case SPELL_AURA_MOD_DAMAGE_DONE:
-                switch (misc)
-                {
-                    case 126: return EQUIP_SPELL_FAMILY_SPELL_DAMAGE;
-                    case 2:   return EQUIP_SPELL_FAMILY_HOLY_DAMAGE;
-                    case 4:   return EQUIP_SPELL_FAMILY_FIRE_DAMAGE;
-                    case 8:   return EQUIP_SPELL_FAMILY_NATURE_DAMAGE;
-                    case 16:  return EQUIP_SPELL_FAMILY_FROST_DAMAGE;
-                    case 32:  return EQUIP_SPELL_FAMILY_SHADOW_DAMAGE;
-                    case 64:  return EQUIP_SPELL_FAMILY_ARCANE_DAMAGE;
-                    default:  return EQUIP_SPELL_FAMILY_NONE;
-                }
-            case SPELL_AURA_MOD_HEALING_DONE:
-                return EQUIP_SPELL_FAMILY_HEALING;
-            case SPELL_AURA_MOD_POWER_REGEN:
-                return (misc == 0) ? EQUIP_SPELL_FAMILY_MANA_REGEN : EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_TARGET_RESISTANCE:
-                if (misc == 1)
-                    return EQUIP_SPELL_FAMILY_ARMOR_PENETRATION;
-                if (misc == 124 || misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
-                    return EQUIP_SPELL_FAMILY_SPELL_PENETRATION;
-                return EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_ATTACK_POWER:
-                if (misc == 0)
-                {
-                    if (spell->SpellName[0].find("Feral") != std::string::npos)
-                        return EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER;
-                    return EQUIP_SPELL_FAMILY_ATTACK_POWER;
-                }
-                return EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_RANGED_ATTACK_POWER:
-                return (misc == 0) ? EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER : EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_HEALTH_REGEN_PERCENT:
-                return (misc == 0) ? EQUIP_SPELL_FAMILY_HEALTH_REGEN : EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_SKILL:
-                return (misc == 95) ? EQUIP_SPELL_FAMILY_DEFENSE : EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_SHIELD_BLOCKVALUE:
-                return (misc == 0) ? EQUIP_SPELL_FAMILY_BLOCK_VALUE : EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_DUMMY:
-                if (spell->SpellName[0].find("Vampirism") != std::string::npos)
-                    return EQUIP_SPELL_FAMILY_LEECH;
-                return EQUIP_SPELL_FAMILY_NONE;
-            case SPELL_AURA_MOD_ATTACKSPEED:
-            case SPELL_AURA_MOD_CASTING_SPEED_NOT_STACK:
-            case SPELL_AURA_MOD_MELEE_HASTE:
-            case SPELL_AURA_MOD_RANGED_HASTE:
-                if (spell->SpellName[0].find("Haste") != std::string::npos)
-                    return EQUIP_SPELL_FAMILY_HASTE;
-                return EQUIP_SPELL_FAMILY_NONE;
-            default:
-                return EQUIP_SPELL_FAMILY_NONE;
+            if (!spell->Effect[eff])
+                continue;
+
+            uint32 aura = spell->EffectApplyAuraName[eff];
+            int32 misc = spell->EffectMiscValue[eff];
+
+            switch (aura)
+            {
+                case SPELL_AURA_MOD_DAMAGE_DONE:
+                    switch (misc)
+                    {
+                        case 126: family = EQUIP_SPELL_FAMILY_SPELL_DAMAGE; break;
+                        case 2:   family = EQUIP_SPELL_FAMILY_HOLY_DAMAGE; break;
+                        case 4:   family = EQUIP_SPELL_FAMILY_FIRE_DAMAGE; break;
+                        case 8:   family = EQUIP_SPELL_FAMILY_NATURE_DAMAGE; break;
+                        case 16:  family = EQUIP_SPELL_FAMILY_FROST_DAMAGE; break;
+                        case 32:  family = EQUIP_SPELL_FAMILY_SHADOW_DAMAGE; break;
+                        case 64:  family = EQUIP_SPELL_FAMILY_ARCANE_DAMAGE; break;
+                        default:  break;
+                    }
+                    break;
+                case SPELL_AURA_MOD_HEALING_DONE:
+                    family = EQUIP_SPELL_FAMILY_HEALING;
+                    break;
+                case SPELL_AURA_MOD_POWER_REGEN:
+                    if (misc == 0)
+                        family = EQUIP_SPELL_FAMILY_MANA_REGEN;
+                    break;
+                case SPELL_AURA_MOD_TARGET_RESISTANCE:
+                    if (misc == 1)
+                        family = EQUIP_SPELL_FAMILY_ARMOR_PENETRATION;
+                    else if (misc == 124 || misc == 126 || misc == 2 || misc == 4 || misc == 8 || misc == 16 || misc == 32 || misc == 64)
+                        family = EQUIP_SPELL_FAMILY_SPELL_PENETRATION;
+                    break;
+                case SPELL_AURA_MOD_ATTACK_POWER:
+                    if (misc == 0)
+                    {
+                        if (spell->SpellName[0].find("Feral") != std::string::npos)
+                            family = EQUIP_SPELL_FAMILY_FERAL_ATTACK_POWER;
+                        else
+                            family = EQUIP_SPELL_FAMILY_ATTACK_POWER;
+                    }
+                    break;
+                case SPELL_AURA_MOD_RANGED_ATTACK_POWER:
+                    if (misc == 0)
+                        family = EQUIP_SPELL_FAMILY_RANGED_ATTACK_POWER;
+                    break;
+                case SPELL_AURA_MOD_HEALTH_REGEN_PERCENT:
+                    if (misc == 0)
+                        family = EQUIP_SPELL_FAMILY_HEALTH_REGEN;
+                    break;
+                case SPELL_AURA_MOD_SKILL:
+                    if (misc == 95)
+                        family = EQUIP_SPELL_FAMILY_DEFENSE;
+                    break;
+                case SPELL_AURA_MOD_SHIELD_BLOCKVALUE:
+                    if (misc == 0)
+                        family = EQUIP_SPELL_FAMILY_BLOCK_VALUE;
+                    break;
+                case SPELL_AURA_DUMMY:
+                    if (spell->SpellName[0].find("Vampirism") != std::string::npos)
+                        family = EQUIP_SPELL_FAMILY_LEECH;
+                    break;
+                case SPELL_AURA_MOD_ATTACKSPEED:
+                case SPELL_AURA_MOD_CASTING_SPEED_NOT_STACK:
+                case SPELL_AURA_MOD_MELEE_HASTE:
+                case SPELL_AURA_MOD_RANGED_HASTE:
+                    if (spell->SpellName[0].find("Haste") != std::string::npos)
+                        family = EQUIP_SPELL_FAMILY_HASTE;
+                    break;
+                default:
+                    break;
+            }
+
+            if (family != EQUIP_SPELL_FAMILY_NONE)
+            {
+                foundBaseVal = std::abs(spell->EffectBasePoints[eff] + 1);
+                break;
+            }
         }
+
+        if (family != EQUIP_SPELL_FAMILY_NONE)
+        {
+            std::lock_guard<std::mutex> lock(s_store.mutex);
+            s_store.spellToFamily[spellId] = family;
+            if (foundBaseVal > 0)
+            {
+                s_store.spellToValue[spellId] = foundBaseVal;
+            }
+        }
+
+        return family;
     }
 
     int32 GetEquipSpellBaseValue(uint32 spellId)
@@ -566,6 +606,16 @@ namespace ItemScalingEquipSpell
         {
             std::lock_guard<std::mutex> lock(s_store.mutex);
             EnsureCanonicalLoaded(s_store);
+            auto it = s_store.spellToValue.find(spellId);
+            if (it != s_store.spellToValue.end())
+                return it->second;
+        }
+
+        // Resolving family will discover and cache the value if valid
+        (void)GetSpellFamily(spellId);
+
+        {
+            std::lock_guard<std::mutex> lock(s_store.mutex);
             auto it = s_store.spellToValue.find(spellId);
             if (it != s_store.spellToValue.end())
                 return it->second;

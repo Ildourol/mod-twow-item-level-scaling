@@ -30,6 +30,54 @@ static char const* GetPolicyName(RequiredLevelPolicy policy)
     }
 }
 
+static bool ParseItemAndLevelArgs(std::string const& rest, uint32& outItemId, uint32& outTargetLvl)
+{
+    if (rest.empty())
+        return false;
+
+    uint32 itemId = 0;
+    uint32 targetLvl = 60;
+    auto linkPos = rest.find("|Hitem:");
+    if (linkPos != std::string::npos)
+    {
+        size_t idStart = linkPos + 7;
+        size_t idEnd = rest.find(':', idStart);
+        if (idEnd != std::string::npos)
+        {
+            itemId = static_cast<uint32>(strtoul(rest.substr(idStart, idEnd - idStart).c_str(), nullptr, 10));
+        }
+        auto linkClose = rest.find("|h|r", linkPos);
+        if (linkClose != std::string::npos)
+        {
+            std::string rem = rest.substr(linkClose + 4);
+            char* end = nullptr;
+            uint32 lvl = strtoul(rem.c_str(), &end, 10);
+            if (lvl > 0)
+            {
+                targetLvl = lvl;
+            }
+        }
+    }
+    else
+    {
+        char const* start = rest.c_str();
+        char* end = nullptr;
+        itemId = strtoul(start, &end, 10);
+        if (end && *end)
+        {
+            targetLvl = strtoul(end, nullptr, 10);
+            if (targetLvl == 0)
+            {
+                targetLvl = 60;
+            }
+        }
+    }
+
+    outItemId = itemId;
+    outTargetLvl = std::clamp<uint32>(targetLvl, 1, 80);
+    return outItemId > 0;
+}
+
 namespace
 {
     class ItemScalingCommandScript final : public AllCommandScript
@@ -161,50 +209,13 @@ namespace
                 return;
             }
 
-            if (rest.empty())
-            {
-                handler->SendSysMessage("Usage: .itemscaling preview <itemId> [targetLevel]");
-                return;
-            }
-
             uint32 itemId = 0;
             uint32 targetLvl = 60;
-            auto linkPos = rest.find("|Hitem:");
-            if (linkPos != std::string::npos)
+            if (!ParseItemAndLevelArgs(rest, itemId, targetLvl))
             {
-                size_t idStart = linkPos + 7;
-                size_t idEnd = rest.find(':', idStart);
-                if (idEnd != std::string::npos)
-                {
-                    itemId = static_cast<uint32>(strtoul(rest.substr(idStart, idEnd - idStart).c_str(), nullptr, 10));
-                }
-                auto linkClose = rest.find("|h|r", linkPos);
-                if (linkClose != std::string::npos)
-                {
-                    std::string rem = rest.substr(linkClose + 4);
-                    char* end = nullptr;
-                    uint32 lvl = strtoul(rem.c_str(), &end, 10);
-                    if (lvl > 0)
-                    {
-                        targetLvl = lvl;
-                    }
-                }
+                handler->SendSysMessage("Usage: .itemscaling preview <itemId|itemLink> [targetLevel]");
+                return;
             }
-            else
-            {
-                char const* start = rest.c_str();
-                char* end = nullptr;
-                itemId = strtoul(start, &end, 10);
-                if (end && *end)
-                {
-                    targetLvl = strtoul(end, nullptr, 10);
-                    if (targetLvl == 0)
-                    {
-                        targetLvl = 60;
-                    }
-                }
-            }
-            targetLvl = std::clamp<uint32>(targetLvl, 1, 80);
 
             ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
             if (!proto)
@@ -285,26 +296,13 @@ namespace
                 return;
             }
 
-            if (rest.empty())
-            {
-                handler->SendSysMessage("Usage: .itemscaling generate <itemId> [targetLevel]");
-                return;
-            }
-
             uint32 itemId = 0;
             uint32 targetLvl = 60;
-            char const* start = rest.c_str();
-            char* end = nullptr;
-            itemId = strtoul(start, &end, 10);
-            if (end && *end)
+            if (!ParseItemAndLevelArgs(rest, itemId, targetLvl))
             {
-                targetLvl = strtoul(end, nullptr, 10);
-                if (targetLvl == 0)
-                {
-                    targetLvl = 60;
-                }
+                handler->SendSysMessage("Usage: .itemscaling generate <itemId|itemLink> [targetLevel]");
+                return;
             }
-            targetLvl = std::clamp<uint32>(targetLvl, 1, 80);
 
             ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
             if (!proto)
@@ -337,7 +335,11 @@ namespace
                     variantEntry, proto->Name1.c_str(), proto->ItemId, targetLvl, targetIlvl);
                 if (handler->GetSession() && handler->GetSession()->GetPlayer())
                 {
-                    handler->GetSession()->GetPlayer()->AddItem(variantEntry, 1);
+                    Item* added = handler->GetSession()->GetPlayer()->AddItem(variantEntry, 1);
+                    if (!added)
+                    {
+                        handler->SendSysMessage("|cffff8000[ItemScaling] Warning: Could not add item to bags (inventory full).|r");
+                    }
                 }
             }
             else

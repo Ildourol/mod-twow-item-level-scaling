@@ -23,6 +23,8 @@ namespace ItemScalingSafety
 
     inline std::uint8_t Bracket(std::uint8_t level, std::uint8_t low, std::uint8_t high, std::uint8_t step)
     {
+        if (low > high)
+            std::swap(low, high);
         level = std::clamp(level, low, high);
         step = std::max<std::uint8_t>(1, step);
         if (level == high)
